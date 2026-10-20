@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest",
+        "--executable-path",
+        "/home/samael/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome",
+        "--headless",
+        "--no-sandbox"
+      ],
+      "description": "Control del navegador con Playwright: navegación, capturas y pruebas"
+    },
+    "context7": {
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {
+        "Authorization": "!printf 'Bearer %s' \"${CONTEXT7_API_KEY:-}\""
+      },
+      "exposure": "direct",
+      "description": "Documentación de librerías y frameworks actualizada (Context7)"
+    }
+  }
+}

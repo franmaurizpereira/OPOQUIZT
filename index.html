@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OPOQUIZ · Banco de preguntas vectorial</title>
+    <!-- Favicon en línea: monitor CRT en píxeles (evita el 404 de /favicon.ico) -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Crect width='16' height='16' fill='%2305060f'/%3E%3Crect x='2' y='2' width='12' height='10' fill='%230b1022' stroke='%2300e5ff'/%3E%3Crect x='4' y='4' width='8' height='2' fill='%2339ff14'/%3E%3Crect x='4' y='8' width='5' height='2' fill='%23ffe600'/%3E%3Crect x='6' y='13' width='4' height='1' fill='%23ff2bd6'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Efecto de scanlines (líneas de monitor CRT) -->
+    <div class="scanlines" aria-hidden="true"></div>
+
+    <header class="cabecera">
+        <h1 class="titulo">OPO<span class="titulo-acento">QUIZ</span></h1>
+        <p class="subtitulo">Banco de datos vectorial · 30 preguntas</p>
+    </header>
+
+    <main class="contenedor">
+        <!-- Pantalla de inicio -->
+        <section id="pantalla-inicio" class="pantalla">
+            <h2 class="pantalla-titulo">&gt; PREPARADOS, ASPIRANTE?</h2>
+            <p class="pantalla-texto">
+                30 preguntas tipo test generadas a partir de los documentos
+               ADMINISTRACIÓN PÚBLICA indexados en la base de datos vectorial.
+            </p>
+            <ul class="caracteristicas">
+                <li>&gt; 30 PREGUNTAS</li>
+                <li>&gt; 4 OPCIONES POR PREGUNTA</li>
+                <li>&gt; EXPLICACIÓN TRAS CADA RESPUESTA</li>
+            </ul>
+            <button id="boton-empezar" class="boton boton-grande" type="button">EMPEZAR PARTIDA</button>
+        </section>
+
+        <!-- Pantalla del quiz -->
+        <section id="pantalla-quiz" class="pantalla oculto">
+            <div class="progreso">
+                <div class="progreso-texto">
+                    PREGUNTA <span id="pregunta-actual">1</span> / <span id="pregunta-total">30</span>
+                    <span class="progreso-marcador">&gt; ACIERTOS: <span id="contador-aciertos">0</span></span>
+                </div>
+                <div class="progreso-barra" role="progressbar" aria-label="Progreso del quiz">
+                    <div id="progreso-relleno" class="progreso-relleno"></div>
+                </div>
+            </div>
+
+            <!-- Contenedor de preguntas: la librería quizlib.min.js lee de aquí -->
+            <div id="contenedor-quiz" class="quiz"></div>
+
+            <div class="controles">
+                <button id="boton-siguiente" class="boton oculto" type="button">SIGUIENTE &gt;</button>
+            </div>
+        </section>
+
+        <!-- Pantalla final -->
+        <section id="pantalla-final" class="pantalla oculto">
+            <h2 class="pantalla-titulo">&gt; FIN DE LA PARTIDA</h2>
+            <div id="resultado-puntuacion" class="puntuacion">0 / 30</div>
+            <p id="resultado-texto" class="pantalla-texto"></p>
+            <button id="boton-reiniciar" class="boton boton-grande" type="button">VOLVER A EMPEZAR</button>
+        </section>
+    </main>
+
+    <footer class="pie">
+        <p>OPOQUIZ · GENERADO CON POSTGRESQL + PGVECTOR · OLLAMA</p>
+    </footer>
+
+    <script src="js/quizlib.min.js"></script>
+    <script src="js/quiz.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

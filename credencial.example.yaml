@@ -1,0 +1,10 @@
+# =============================================================
+# Plantilla de credenciales de la base de datos.
+# Copia este fichero como "credencial.yaml" y rellena los valores.
+# "credencial.yaml" está en .gitignore: NUNCA se versiona.
+# =============================================================
+user: opopdf
+passwd: cambia-esta-clave
+host: localhost
+port: 5432
+database: opopdf

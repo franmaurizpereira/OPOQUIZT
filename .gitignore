@@ -1,0 +1,22 @@
+# Entorno virtual de Python
+.venv/
+__pycache__/
+*.pyc
+
+# Dependencias de Node (pruebas)
+node_modules/
+
+# Resultados de las pruebas de Playwright
+test-results/
+playwright-report/
+
+# Credenciales de la base de datos (NUNCA versionar)
+credencial.yaml
+credencial*.yaml
+!credencial.example.yaml
+
+# Logs y caché de la generación de preguntas
+logs/
+
+# Sistema operativo
+.DS_Store

@@ -1,0 +1,664 @@
+/* =============================================================
+   OPOQUIZ · Estilo retro de los videojuegos de los años 80
+   Dirección de arte: "terminal de cristal 1987"
+   Paleta CRT: fondo oscuro con acentos neón (lima, cian, magenta, amarillo)
+   ============================================================= */
+
+:root {
+    --fondo: #05060f;
+    --fondo-panel: #0b1022;
+    --neon-lima: #39ff14;
+    --neon-cian: #00e5ff;
+    --neon-magenta: #ff2bd6;
+    --neon-amarillo: #ffe600;
+    --neon-naranja: #ff8a00;
+    --texto: #d6ffe0;
+    --gris: #7a8a99;
+    --rojo: #ff2b4e;
+    --verde: #25ff7a;
+    --fuente: "Courier New", "Lucida Console", "Consolas", monospace;
+
+    /* Bordes y sombras duras: sin desenfoques "SaaS" */
+    --borde: #2a3a5c;
+    --sombra-dura: 4px 4px 0 var(--neon-magenta);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    background: var(--fondo);
+    color: var(--texto);
+    font-family: var(--fuente);
+    min-height: 100%;
+    /* Sin suavizado: los trazos se ven más "pixel" y menos "móvil" */
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    font-variant-ligatures: none;
+}
+
+/* ------------------------------------------------------------ fondo */
+
+body {
+    /* Rejilla del monitor + halo del fósforo + viñeta de tubo */
+    background-image:
+        linear-gradient(rgba(57, 255, 20, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(57, 255, 20, 0.05) 1px, transparent 1px),
+        radial-gradient(circle at 50% 12%, #141a3d 0%, var(--fondo) 68%);
+    background-size: 32px 32px, 32px 32px, 100% 100%;
+    background-attachment: fixed;
+
+    /* Rejilla de 3 franjas: cabecera, contenido y pie */
+    display: grid;
+    grid-template-rows: auto auto auto;
+    align-content: safe center;
+    justify-items: center;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: clamp(18px, 3vw, 34px) clamp(12px, 4vw, 26px) clamp(14px, 2.5vw, 26px);
+    row-gap: clamp(14px, 2.4vw, 24px);
+}
+
+/* Bisel de la cabina: marco fijo de la pantalla del arcade */
+body::before {
+    content: "";
+    position: fixed;
+    inset: 10px;
+    border: 2px solid rgba(0, 229, 255, 0.16);
+    pointer-events: none;
+    z-index: 40;
+}
+
+/* Viñeta del tubo de rayos catódicos */
+body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 52%, rgba(0, 0, 0, 0.6) 100%);
+    pointer-events: none;
+    z-index: 45;
+}
+
+/* Líneas de barrido del monitor */
+.scanlines {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 50;
+    background: repeating-linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0) 0px,
+        rgba(0, 0, 0, 0) 2px,
+        rgba(0, 0, 0, 0.32) 3px,
+        rgba(0, 0, 0, 0.32) 4px
+    );
+    mix-blend-mode: multiply;
+}
+
+/* ------------------------------------------------------------ cabecera */
+
+.cabecera {
+    text-align: center;
+    margin-bottom: 0;
+    width: min(880px, 100%);
+}
+
+.titulo {
+    margin: 0;
+    font-size: clamp(2rem, 6.5vw, 3.4rem);
+    letter-spacing: 6px;
+    color: var(--neon-lima);
+    /* Una sola sombra dura magenta: sombra de píxel, no de neblina */
+    text-shadow:
+        3px 3px 0 var(--neon-magenta),
+        0 0 22px rgba(57, 255, 20, 0.45);
+    animation: parpadeo 4s infinite steps(1);
+}
+
+.titulo-acento {
+    color: var(--neon-cian);
+    text-shadow:
+        3px 3px 0 var(--neon-magenta),
+        0 0 22px rgba(0, 229, 255, 0.45);
+}
+
+.subtitulo {
+    margin: 12px 0 0;
+    color: var(--neon-amarillo);
+    font-size: 0.78rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+}
+
+/* Barra de espectro: el "cargando" de las consolas de 8 bits */
+.cabecera::after {
+    content: "";
+    display: block;
+    width: min(360px, 78%);
+    height: 6px;
+    margin: 14px auto 0;
+    background: repeating-linear-gradient(
+        90deg,
+        var(--neon-lima) 0 18px,
+        var(--neon-amarillo) 18px 36px,
+        var(--neon-naranja) 36px 54px,
+        var(--neon-magenta) 54px 72px,
+        var(--neon-cian) 72px 90px
+    );
+    opacity: 0.85;
+    box-shadow: 0 0 12px rgba(0, 229, 255, 0.35);
+}
+
+@keyframes parpadeo {
+    0%, 92%, 100% { opacity: 1; }
+    94% { opacity: 0.72; }
+    96% { opacity: 1; }
+    98% { opacity: 0.86; }
+}
+
+/* ------------------------------------------------------------ pantallas */
+
+.contenedor {
+    width: min(880px, 100%);
+    align-self: stretch;
+}
+
+.pantalla {
+    position: relative;
+    background: linear-gradient(180deg, rgba(16, 22, 48, 0.96) 0%, rgba(7, 10, 26, 0.96) 100%);
+    border: 3px solid var(--neon-cian);
+    padding: 28px;
+    clip-path: polygon(
+        10px 0, calc(100% - 10px) 0, calc(100% - 10px) 6px, 100% 6px,
+        100% calc(100% - 10px), calc(100% - 10px) calc(100% - 6px),
+        calc(100% - 10px) 100%, 10px 100%, 10px calc(100% - 6px),
+        0 calc(100% - 6px), 0 10px, 6px 10px, 6px 0
+    );
+    box-shadow: 0 0 22px rgba(0, 229, 255, 0.22), inset 0 0 30px rgba(0, 0, 0, 0.7);
+}
+
+/* Bisel interior punteado: el marco de cristal del tubo */
+.pantalla::before {
+    content: "";
+    position: absolute;
+    inset: 8px;
+    border: 1px dashed rgba(0, 229, 255, 0.18);
+    pointer-events: none;
+}
+
+.oculto {
+    display: none !important;
+}
+
+.pantalla-titulo {
+    margin: 0 0 18px;
+    color: var(--neon-amarillo);
+    font-size: clamp(1.05rem, 3.2vw, 1.5rem);
+    letter-spacing: 2px;
+    text-shadow: 0 0 12px rgba(255, 230, 0, 0.4);
+}
+
+.pantalla-texto {
+    color: var(--texto);
+    line-height: 1.75;
+    font-size: 0.95rem;
+    text-align: center;
+    max-width: 62ch;
+    margin-inline: auto;
+}
+
+.caracteristicas {
+    list-style: none;
+    padding: 0;
+    margin: 22px auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 26px;
+    justify-content: center;
+    color: var(--neon-lima);
+    font-size: 0.78rem;
+    letter-spacing: 1px;
+}
+
+.caracteristicas li {
+    position: relative;
+    padding-left: 16px;
+}
+
+.caracteristicas li::before {
+    content: "▸";
+    position: absolute;
+    left: 0;
+    color: var(--neon-cian);
+}
+
+/* ------------------------------------------------------------- botones */
+
+.boton {
+    position: relative;
+    font-family: var(--fuente);
+    font-size: 0.92rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--fondo);
+    background: var(--neon-lima);
+    border: 0;
+    padding: 13px 24px;
+    cursor: pointer;
+    text-shadow: none;
+    box-shadow: var(--sombra-dura), inset 0 2px 0 rgba(255, 255, 255, 0.4);
+    clip-path: polygon(
+        8px 0, calc(100% - 8px) 0, calc(100% - 8px) 4px, 100% 4px,
+        100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%,
+        8px calc(100% - 4px), 0 calc(100% - 4px), 0 8px, 4px 8px, 4px 0
+    );
+    transition: transform 0.08s steps(2), background 0.12s steps(2), box-shadow 0.12s steps(2);
+}
+
+/* Cursor de juego delante del texto del botón */
+.boton::before {
+    content: "▶";
+    margin-right: 10px;
+    font-size: 0.8em;
+    color: rgba(5, 6, 15, 0.8);
+}
+
+.boton:hover {
+    background: var(--neon-amarillo);
+    box-shadow: 4px 4px 0 var(--neon-cian), inset 0 2px 0 rgba(255, 255, 255, 0.45);
+}
+
+.boton:active {
+    transform: translate(4px, 4px);
+    box-shadow: 0 0 0 var(--neon-magenta);
+}
+
+.boton:focus-visible {
+    outline: 3px solid var(--neon-cian);
+    outline-offset: 3px;
+}
+
+.boton-grande {
+    font-size: 1.05rem;
+    padding: 16px 30px;
+    display: block;
+    margin: 0 auto;
+}
+
+.controles {
+    margin-top: 24px;
+    text-align: center;
+}
+
+/* ------------------------------------------------------------ progreso */
+
+.progreso {
+    margin-bottom: 22px;
+}
+
+.progreso-texto {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    color: var(--neon-cian);
+    letter-spacing: 2px;
+    font-size: 0.88rem;
+    margin-bottom: 10px;
+}
+
+/* Contador con ceros a la izquierda: formato de máquina */
+#pregunta-actual {
+    display: inline-block;
+    min-width: 2ch;
+    color: var(--neon-amarillo);
+    text-shadow: 0 0 10px rgba(255, 230, 0, 0.5);
+}
+
+.progreso-marcador {
+    color: var(--neon-lima);
+    margin-left: auto;
+}
+
+.progreso-barra {
+    position: relative;
+    height: 20px;
+    border: 2px solid var(--neon-magenta);
+    padding: 0;
+    background: rgba(0, 0, 0, 0.6);
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
+}
+
+/* Separadores de celda: 30 trocitos, pintados encima del relleno */
+.progreso-barra::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        90deg,
+        transparent 0 calc(100% / 30 - 2px),
+        rgba(5, 6, 15, 0.9) calc(100% / 30 - 2px) calc(100% / 30)
+    );
+    pointer-events: none;
+}
+
+.progreso-relleno {
+    position: relative;
+    height: 100%;
+    width: 0;
+    background: var(--neon-lima);
+    box-shadow: 0 0 12px rgba(57, 255, 20, 0.6);
+    transition: width 0.3s steps(8);
+}
+
+/* Cursor parpadeante al final del avance: el jugador está aquí */
+.progreso-relleno::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: -6px;
+    width: 6px;
+    height: 100%;
+    background: var(--neon-amarillo);
+    box-shadow: 0 0 10px rgba(255, 230, 0, 0.8);
+    animation: parpadeo 1.1s infinite steps(1);
+}
+
+/* ------------------------------------------------------------- quiz */
+
+.quiz {
+    min-height: 200px;
+}
+
+.quizlib-question {
+    margin: 0;
+}
+
+.quizlib-question-title {
+    color: var(--neon-amarillo);
+    font-size: 1.05rem;
+    line-height: 1.65;
+    margin: 0 0 20px;
+    letter-spacing: 1px;
+    max-width: 68ch;
+    text-shadow: 0 0 10px rgba(255, 230, 0, 0.25);
+}
+
+.quizlib-question-answers ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.opcion {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    border: 2px solid var(--borde);
+    border-left-width: 6px;
+    background: rgba(6, 10, 24, 0.9);
+    padding: 11px 14px;
+    cursor: pointer;
+    line-height: 1.55;
+    font-size: 0.95rem;
+    transition: border-color 0.12s steps(2), background 0.12s steps(2), box-shadow 0.12s steps(2);
+}
+
+.opcion-etiqueta {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    width: 100%;
+    cursor: pointer;
+}
+
+.opcion-texto {
+    flex: 1;
+}
+
+/* Casilla de radio dibujada a píxeles (nada de botón nativo) */
+.opcion input[type="radio"] {
+    appearance: none;
+    -webkit-appearance: none;
+    flex: 0 0 20px;
+    width: 20px;
+    height: 20px;
+    margin: 1px 0 0;
+    border: 0;
+    background: transparent;
+    box-shadow: inset 0 0 0 2px var(--borde);
+    clip-path: polygon(0 0, 100% 0, 100% 75%, 75% 75%, 75% 100%, 0 100%);
+    cursor: pointer;
+    transition: box-shadow 0.12s steps(2), background 0.12s steps(2);
+}
+
+.opcion input[type="radio"]:hover {
+    box-shadow: inset 0 0 0 2px var(--neon-cian);
+}
+
+.opcion input[type="radio"]:checked {
+    background: var(--neon-lima);
+    box-shadow: inset 0 0 0 2px var(--neon-lima), 0 0 10px rgba(57, 255, 20, 0.7);
+}
+
+.opcion input[type="radio"]:focus-visible {
+    outline: 3px solid var(--neon-cian);
+    outline-offset: 3px;
+}
+
+.opcion input[type="radio"]:disabled {
+    opacity: 1;
+}
+
+.opcion:not(.respondida):hover {
+    border-color: var(--neon-cian);
+    border-left-color: var(--neon-cian);
+    background: rgba(0, 229, 255, 0.08);
+    box-shadow: 0 0 14px rgba(0, 229, 255, 0.2);
+}
+
+.opcion.respondida {
+    cursor: default;
+}
+
+/* Opción correcta: siempre en verde */
+.opcion.quizlib-correct {
+    border-color: var(--verde);
+    border-left-color: var(--verde);
+    background: rgba(37, 255, 122, 0.1);
+    color: var(--verde);
+    box-shadow: 0 0 14px rgba(37, 255, 122, 0.3);
+    padding-right: 40px;
+}
+
+.opcion.quizlib-correct input[type="radio"] {
+    background: var(--verde);
+    box-shadow: inset 0 0 0 2px var(--verde), 0 0 12px rgba(37, 255, 122, 0.7);
+}
+
+/* Opción elegida y equivocada: en rojo */
+.opcion.quizlib-incorrect {
+    border-color: var(--rojo);
+    border-left-color: var(--rojo);
+    background: rgba(255, 43, 78, 0.12);
+    color: var(--rojo);
+    box-shadow: 0 0 14px rgba(255, 43, 78, 0.3);
+    padding-right: 40px;
+}
+
+.opcion.quizlib-incorrect input[type="radio"] {
+    background: var(--rojo);
+    box-shadow: inset 0 0 0 2px var(--rojo), 0 0 12px rgba(255, 43, 78, 0.7);
+}
+
+/* Sello de resultado al final de la opción */
+.opcion.quizlib-correct::after,
+.opcion.quizlib-incorrect::after {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.1rem;
+    line-height: 1;
+}
+
+.opcion.quizlib-correct::after {
+    content: "✔";
+    color: var(--verde);
+    text-shadow: 0 0 10px rgba(37, 255, 122, 0.8);
+}
+
+.opcion.quizlib-incorrect::after {
+    content: "✘";
+    color: var(--rojo);
+    text-shadow: 0 0 10px rgba(255, 43, 78, 0.8);
+}
+
+.quizlib-question-warning {
+    color: var(--rojo);
+    margin-left: 1em;
+    margin-bottom: 0.5em;
+}
+
+/* --------------------------------------------------------- explicación */
+
+.explicacion {
+    margin-top: 20px;
+    border-left: 4px solid var(--neon-lima);
+    background: rgba(2, 4, 12, 0.85);
+    padding: 14px 16px;
+    font-size: 0.9rem;
+    line-height: 1.7;
+    color: var(--texto);
+    box-shadow: inset 0 0 22px rgba(0, 0, 0, 0.8);
+}
+
+.explicacion-titulo {
+    display: block;
+    color: var(--neon-lima);
+    letter-spacing: 3px;
+    font-size: 0.75rem;
+    margin-bottom: 8px;
+    text-shadow: 0 0 10px rgba(57, 255, 20, 0.5);
+}
+
+/* ------------------------------------------------------- pantalla final */
+
+.puntuacion {
+    font-size: clamp(2rem, 9vw, 3.4rem);
+    color: var(--neon-cian);
+    text-align: center;
+    text-shadow: 3px 3px 0 var(--neon-magenta), 0 0 20px rgba(0, 229, 255, 0.5);
+    margin: 14px 0 10px;
+    letter-spacing: 3px;
+}
+
+/* --------------------------------------------------------------- pie */
+
+.pie {
+    margin-top: 0;
+    width: min(880px, 100%);
+    padding-top: 12px;
+    border-top: 2px dashed rgba(122, 138, 153, 0.45);
+    color: var(--gris);
+    font-size: 0.7rem;
+    letter-spacing: 2px;
+    text-align: center;
+}
+
+.pie p {
+    margin: 0;
+}
+
+/* ----------------------------------------------- movimiento reducido */
+
+@media (prefers-reduced-motion: reduce) {
+    .titulo,
+    .progreso-relleno::after {
+        animation: none;
+    }
+
+    .progreso-relleno {
+        transition: none;
+    }
+
+    .boton,
+    .opcion,
+    .opcion input[type="radio"] {
+        transition: none;
+    }
+}
+
+/* --------------------------------------------------------- adaptación */
+
+@media (max-width: 560px) {
+    body {
+        padding: 16px 12px 18px;
+    }
+
+    body::before {
+        inset: 5px;
+    }
+
+    .pantalla {
+        padding: 20px 14px;
+    }
+
+    .pantalla::before {
+        inset: 5px;
+    }
+
+    .titulo {
+        letter-spacing: 3px;
+    }
+
+    .subtitulo {
+        letter-spacing: 2px;
+        font-size: 0.7rem;
+    }
+
+    .cabecera::after {
+        width: 72%;
+        height: 5px;
+    }
+
+    .titulo {
+        font-size: 1.9rem;
+    }
+
+    .opcion {
+        font-size: 0.88rem;
+        padding: 10px 11px;
+    }
+
+    .opcion.quizlib-correct,
+    .opcion.quizlib-incorrect {
+        padding-right: 34px;
+    }
+
+    .opcion.quizlib-correct::after,
+    .opcion.quizlib-incorrect::after {
+        right: 8px;
+    }
+
+    .progreso-texto {
+        font-size: 0.78rem;
+        letter-spacing: 1px;
+    }
+
+    .progreso-marcador {
+        margin-left: 0;
+    }
+
+    .boton {
+        padding: 12px 18px;
+        font-size: 0.85rem;
+    }
+}

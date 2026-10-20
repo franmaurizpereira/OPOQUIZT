@@ -1,0 +1,5 @@
+pymupdf>=1.24
+pdfplumber>=0.11
+pgvector>=0.3
+psycopg[binary]>=3.2
+PyYAML>=6.0

@@ -1,0 +1,12 @@
+{
+  "name": "opoquiz",
+  "version": "1.0.0",
+  "description": "Quiz de 30 preguntas generado desde una base de datos vectorial",
+  "private": true,
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0"
+  }
+}
