@@ -1,0 +1,35 @@
+name: Pruebas
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Suite de Playwright
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Preparar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Instalar las dependencias de Node
+        run: npm ci
+
+      - name: Instalar Chromium y sus dependencias
+        run: npx playwright install --with-deps chromium
+
+      - name: Instalar PyYAML (lo necesita el servidor de la aplicación)
+        run: python3 -m pip install --upgrade PyYAML
+
+      - name: Ejecutar las pruebas
+        run: npx playwright test

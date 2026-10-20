@@ -1,8 +1,35 @@
 # OPOQUIZ
 
-Aplicación web que crea una **base de datos vectorial** a partir de los PDF de
-`pdfs/` y genera un **quiz de 30 preguntas** que se sirve en el navegador con
-la librería `quizlib.min.js` y estética retro de los años 80.
+![Pruebas](https://github.com/franmaurizpereira/OPOQUIZT/actions/workflows/tests.yml/badge.svg)
+![Licencia](https://img.shields.io/badge/estilo-retro%2080s-00e5ff)
+
+Aplicación web que crea una **base de datos vectorial** a partir de PDF de
+Administración Pública y genera un **quiz de 30 preguntas** que se sirve en el
+navegador con la librería `quizlib.min.js` y estética retro de los años 80.
+
+> ⚠️ **Los PDF de origen no están en el repositorio** (son material local de
+> estudio). Colócalos en `pdfs/` para poder reingerir o regenerar el banco de
+> preguntas; el quiz publicado (`js/quiz.js`) ya está incluido y se puede
+> jugar sin ellos.
+
+## Capturas
+
+**Pantalla de inicio** con el historial de las últimas partidas:
+
+![Pantalla de inicio](docs/img/inicio.png)
+
+**Pregunta contestada**: la opción correcta en verde, la fallada en rojo y la
+explicación del por qué:
+
+![Pregunta contestada](docs/img/pregunta.png)
+
+**Pantalla final** con la puntuación y el reinicio:
+
+![Pantalla final](docs/img/final.png)
+
+**Vista móvil** (380 px):
+
+![Vista móvil](docs/img/movil.png)
 
 ## Flujo
 
@@ -12,6 +39,8 @@ pdfs/*.pdf  →  extract.py  →  chunk.py  →  embed.py  →  PostgreSQL + pgv
                                        generate_quiz.py  →  js/quiz.js
                                                             ↓
                               index.html + css/style.css + js/app.js  →  QUIZ
+                                                            ↓
+                                   backend/server.py  →  historial de partidas
 ```
 
 ## Requisitos
@@ -142,7 +171,9 @@ El trabajo se apoya en `specs/NNN-nombre/`, con `spec.md` (qué y por qué),
 ├── .pi/settings.json          ← registra los agentes como comandos de Pi
 ├── .agents/skills/            ← skills del proyecto (frontend-design)
 ├── specs/                     ← specs del flujo SDD (spec.md, plan.md, tasks.md)
-├── pdfs/                      ← PDF de origen
+├── docs/img/                  ← capturas de la aplicación para el README
+├── .github/workflows/         ← integración continua (pruebas con Playwright)
+├── pdfs/                      ← PDF de origen (local, no versionado)
 ├── credencial.example.yaml    ← plantilla de credenciales (la real se ignora)
 └── requirements.txt           ← dependencias Python
 ```

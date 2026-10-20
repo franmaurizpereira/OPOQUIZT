@@ -4,10 +4,10 @@
 const fs = require('fs');
 const { defineConfig } = require('@playwright/test');
 
-// Rutas candidatas: la primera que exista en el disco
+// Rutas candidatas del Chromium del sistema: la primera que exista en disco.
+// Si no hay ninguna, Playwright usa el Chromium que instala él mismo.
 const RUTAS_CHROMIUM = [
     process.env.CHROMIUM_PATH,
-    '/home/samael/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome',
     `${process.env.HOME}/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome`,
 ].filter(Boolean);
 
