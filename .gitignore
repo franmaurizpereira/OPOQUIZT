@@ -18,5 +18,8 @@ credencial*.yaml
 # Logs y caché de la generación de preguntas
 logs/
 
+# Historial local de partidas (estado del equipo, no código)
+data/
+
 # Sistema operativo
 .DS_Store

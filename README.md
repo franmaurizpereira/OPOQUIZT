@@ -42,10 +42,14 @@ psql -f backend/db.sql
 # 5. Generar las 30 preguntas y volcar js/quiz.js
 .venv/bin/python backend/generate_quiz.py
 
-# 6. Servir la web
-python3 -m http.server 8099
+# 6. Servir la web (interfaz + historial de partidas)
+.venv/bin/python backend/server.py --port 8099
 #   http://127.0.0.1:8099/index.html
 ```
+
+El servidor propio sirve la interfaz **y** expone el historial de partidas
+(`GET/POST /api/partidas`). Solo publica `index.html`, `css/` y `js/`: el
+resto del proyecto (credenciales, backend, repositorio) no es accesible.
 
 ## Pruebas
 
@@ -63,6 +67,20 @@ variable de entorno `CHROMIUM_PATH`.
   `credencial.example.yaml` como plantilla.
 - `mcp.json` no contiene claves: la de Context7 se toma de la variable de
   entorno `CONTEXT7_API_KEY`.
+- Arranca siempre la web con `backend/server.py`, **no** con
+  `python3 -m http.server`: este último sirve todo el directorio y deja
+  `credencial.yaml` y el repositorio accesibles desde el navegador.
+
+## Historial de partidas
+
+La pantalla de inicio muestra las **5 partidas más recientes** con su fecha
+(`dd/mm/aaaa`), los **aciertos en verde** y los **fallos en rojo**.
+
+- Se guarda en el fichero local `data/partidas.json` (ignorado por git; se
+  conserva lo máximo 100 partidas).
+- Se registra automáticamente al terminar cada partida.
+- Para vaciarlo: `rm data/partidas.json`.
+- La base de datos **no** se toca: no hay ninguna tabla para el historial.
 
 ## Agentes (flujo SDD)
 
@@ -96,7 +114,9 @@ El trabajo se apoya en `specs/NNN-nombre/`, con `spec.md` (qué y por qué),
 │   ├── chunk.py               ← troceado semántico
 │   ├── embed.py               ← embeddings con Ollama
 │   ├── ingest.py              ← orquestador de la ingesta
-│   └── generate_quiz.py       ← genera las 30 preguntas y escribe js/quiz.js
+│   ├── generate_quiz.py       ← genera las 30 preguntas y escribe js/quiz.js
+│   ├── historial.py           ← historial de partidas (data/partidas.json)
+│   └── server.py              ← servidor web: interfaz + API del historial
 ├── tests/quiz.spec.js         ← pruebas de Playwright
 ├── playwright.config.js       ← configuración de Playwright
 ├── package.json               ← dependencias de Node (solo tests)

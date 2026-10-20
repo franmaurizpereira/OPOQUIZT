@@ -1,7 +1,30 @@
 // Pruebas automáticas del quiz con Playwright.
 // Comprueban el formato de los datos y el comportamiento descrito en AGENTS.md.
 
+const fs = require('fs');
+const path = require('path');
 const { test, expect } = require('@playwright/test');
+
+// Fichero con el historial de partidas (lo escribe el servidor de la app)
+const RUTA_HISTORIAL = path.join(__dirname, '..', 'data', 'partidas.json');
+
+/**
+ * Escribe el historial con las partidas indicadas y espera a que el servidor
+ * lo recoja (lo lee en cada petición, así que no hay que reiniciarlo).
+ */
+function escribirHistorial(partidas) {
+    fs.mkdirSync(path.dirname(RUTA_HISTORIAL), { recursive: true });
+    fs.writeFileSync(
+        RUTA_HISTORIAL,
+        JSON.stringify({ partidas }, null, 2),
+        'utf-8'
+    );
+}
+
+/** Construye una entrada de historial con la fecha indicada. */
+function partida(fecha, aciertos, fallos) {
+    return { fecha, aciertos, fallos };
+}
 
 test.describe('Datos del quiz (js/quiz.js)', () => {
     test('quizData tiene 30 preguntas válidas y en español', async ({ page }) => {
@@ -143,5 +166,88 @@ test.describe('Comportamiento del quiz', () => {
         for (const palabra of ingleses) {
             expect(texto.includes(palabra), `Se encontró la palabra "${palabra}"`).toBe(false);
         }
+    });
+});
+
+test.describe('Historial de partidas', () => {
+    test('la pantalla de inicio muestra las 5 últimas partidas, de la más reciente a la más antigua', async ({ page }) => {
+        escribirHistorial([
+            partida('2026-01-12T10:00:00', 21, 9),
+            partida('2026-01-13T10:00:00', 25, 5),
+            partida('2026-01-14T10:00:00', 18, 12),
+            partida('2026-01-15T10:00:00', 30, 0),
+            partida('2026-01-16T10:00:00', 12, 18),
+            partida('2026-01-17T10:00:00', 22, 8),
+            partida('2026-01-18T10:00:00', 27, 3),
+        ]);
+
+        await page.goto('/index.html');
+
+        const filas = page.locator('#lista-partidas .partida');
+        await expect(filas).toHaveCount(5);
+
+        // La más reciente primero, con la fecha en dd/mm/aaaa
+        await expect(filas.nth(0)).toContainText('Fecha: 18/01/2026');
+        await expect(filas.nth(1)).toContainText('Fecha: 17/01/2026');
+        await expect(filas.nth(4)).toContainText('Fecha: 14/01/2026');
+
+        // Se muestran los datos de cada partida
+        await expect(filas.nth(0)).toContainText('Aciertos: 27');
+        await expect(filas.nth(0)).toContainText('Fallos: 3');
+    });
+
+    test('los aciertos se muestran en verde y los fallos en rojo', async ({ page }) => {
+        escribirHistorial([partida('2026-01-12T10:00:00', 21, 9)]);
+
+        await page.goto('/index.html');
+
+        const aciertos = page.locator('#lista-partidas .partida-aciertos').first();
+        const fallos = page.locator('#lista-partidas .partida-fallos').first();
+
+        await expect(aciertos).toHaveText('Aciertos: 21');
+        await expect(fallos).toHaveText('Fallos: 9');
+        await expect(aciertos).toHaveCSS('color', 'rgb(37, 255, 122)');
+        await expect(fallos).toHaveCSS('color', 'rgb(255, 43, 78)');
+    });
+
+    test('sin partidas registradas se muestra un mensaje y la app sigue siendo utilizable', async ({ page }) => {
+        escribirHistorial([]);
+
+        await page.goto('/index.html');
+
+        await expect(page.locator('#historial-vacio')).toBeVisible();
+        await expect(page.locator('#historial-vacio')).toContainText('SIN PARTIDAS REGISTRADAS');
+        await expect(page.locator('#lista-partidas .partida')).toHaveCount(0);
+
+        // La pantalla de inicio sigue siendo utilizable
+        await page.getByRole('button', { name: 'EMPEZAR PARTIDA' }).click();
+        await expect(page.locator('.quizlib-question:visible')).toHaveCount(1);
+    });
+
+    test('al terminar una partida se registra en el historial', async ({ page }) => {
+        escribirHistorial([]);
+
+        await page.goto('/index.html');
+        await page.getByRole('button', { name: 'EMPEZAR PARTIDA' }).click();
+
+        // Se responde siempre la primera opción
+        for (let i = 0; i < 30; i++) {
+            await page.locator('.quizlib-question:visible .opcion').first().click();
+            const boton = page.locator('#boton-siguiente');
+            await expect(boton).toBeVisible();
+            await boton.click();
+        }
+
+        await expect(page.locator('#pantalla-final')).toBeVisible();
+
+        // El fichero del historial contiene la partida recién terminada
+        await expect.poll(() => {
+            const datos = JSON.parse(fs.readFileSync(RUTA_HISTORIAL, 'utf-8'));
+            return datos.partidas.length;
+        }).toBe(1);
+
+        const guardada = JSON.parse(fs.readFileSync(RUTA_HISTORIAL, 'utf-8')).partidas[0];
+        expect(guardada.aciertos + guardada.fallos).toBe(30);
+        expect(guardada.fecha).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);
     });
 });

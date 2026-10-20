@@ -27,6 +27,9 @@
     const progresoRelleno = document.getElementById('progreso-relleno');
     const resultadoPuntuacion = document.getElementById('resultado-puntuacion');
     const resultadoTexto = document.getElementById('resultado-texto');
+    const listaPartidas = document.getElementById('lista-partidas');
+    const historialVacio = document.getElementById('historial-vacio');
+    const bloqueHistorial = document.querySelector('.historial');
 
     // Estado de la partida
     let indice = 0;
@@ -211,6 +214,9 @@
         const porcentaje = Math.round((aciertos / TOTAL) * 100);
         resultadoPuntuacion.textContent = aciertos + ' / ' + TOTAL + '  (' + porcentaje + '%)';
 
+        // La partida terminada queda registrada en el historial del equipo
+        registrarPartida(aciertos, TOTAL - aciertos);
+
         let mensaje = '';
         if (porcentaje >= 90) {
             mensaje = '¡IMPRESIONANTE! DOMINAS LA MATERIA. ¡PLAZA CONFIADA!';
@@ -227,6 +233,95 @@
         pantallaFinal.classList.remove('oculto');
     }
 
+    /* -------------------------------------------------------- historial */
+
+    // Número máximo de partidas que se muestran en la pantalla de inicio
+    const MAXIMO_PARTIDAS = 5;
+
+    /**
+     * Formatea una marca de tiempo ISO (AAAA-MM-DDTHH:MM:SS) como dd/mm/aaaa.
+     */
+    function formatearFecha(iso) {
+        const partes = String(iso).split('T');
+        const dia = partes[0].split('-');
+        if (dia.length !== 3) {
+            return iso;
+        }
+        return dia[2] + '/' + dia[1] + '/' + dia[0];
+    }
+
+    /**
+     * Pide el historial de partidas y lo pinta en la pantalla de inicio.
+     * Si el servidor no responde, el bloque se oculta y el juego continúa.
+     */
+    async function cargarHistorial() {
+        try {
+            const respuesta = await fetch('api/partidas', { cache: 'no-store' });
+            if (!respuesta.ok) {
+                throw new Error('el servidor no devolvió el historial');
+            }
+            const datos = await respuesta.json();
+            const partidas = Array.isArray(datos.partidas) ? datos.partidas : [];
+
+            listaPartidas.innerHTML = '';
+
+            if (partidas.length === 0) {
+                historialVacio.classList.remove('oculto');
+                bloqueHistorial.classList.remove('oculto');
+                return;
+            }
+
+            historialVacio.classList.add('oculto');
+            bloqueHistorial.classList.remove('oculto');
+
+            partidas.slice(0, MAXIMO_PARTIDAS).forEach(function (partida) {
+                const fila = document.createElement('li');
+                fila.className = 'partida';
+
+                const fecha = document.createElement('span');
+                fecha.className = 'partida-fecha';
+                fecha.textContent = 'Fecha: ' + formatearFecha(partida.fecha);
+
+                const datosFila = document.createElement('span');
+                datosFila.className = 'partida-datos';
+
+                const aciertos = document.createElement('span');
+                aciertos.className = 'partida-aciertos';
+                aciertos.textContent = 'Aciertos: ' + partida.aciertos;
+
+                const fallos = document.createElement('span');
+                fallos.className = 'partida-fallos';
+                fallos.textContent = 'Fallos: ' + partida.fallos;
+
+                datosFila.appendChild(aciertos);
+                datosFila.appendChild(fallos);
+
+                fila.appendChild(fecha);
+                fila.appendChild(datosFila);
+                listaPartidas.appendChild(fila);
+            });
+        } catch (error) {
+            // Sin historial no se rompe nada: el quiz se juega igual
+            bloqueHistorial.classList.add('oculto');
+        }
+    }
+
+    /**
+     * Registra la partida terminada en el historial del equipo.
+     * Si el registro falla, el resultado se muestra igualmente.
+     */
+    async function registrarPartida(aciertos, fallos) {
+        try {
+            await fetch('api/partidas', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ aciertos: aciertos, fallos: fallos })
+            });
+        } catch (error) {
+            // El registro es secundario: no impide ver el resultado
+        }
+    }
+
     /* --------------------------------------------------------- eventos */
 
     botonEmpezar.addEventListener('click', function () {
@@ -235,7 +330,6 @@
         pantallaQuiz.classList.remove('oculto');
         mostrarPregunta(0);
     });
-
     // Al elegir una opción se corrige y se muestra la explicación
     contenedor.addEventListener('change', function (evento) {
         const entrada = evento.target;
@@ -281,6 +375,8 @@
         pantallaFinal.classList.add('oculto');
         pantallaQuiz.classList.remove('oculto');
         mostrarPregunta(0);
+        // El historial se refresca para que la pantalla de inicio esté al día
+        cargarHistorial();
     });
 
     /* ---------------------------------------------------------- inicio */
@@ -289,4 +385,5 @@
     preguntaTotal.textContent = String(TOTAL);
     construirPreguntas();
     mostrarPregunta(0);
+    cargarHistorial();
 })();

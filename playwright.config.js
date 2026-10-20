@@ -27,8 +27,10 @@ module.exports = defineConfig({
         },
     },
     webServer: {
-        command: 'python3 -m http.server 8099',
-        url: 'http://127.0.0.1:8099/index.html',
+        // Servidor de OPOQUIZ: sirve la interfaz y expone la API del historial
+        command: 'python3 backend/server.py --port 8099',
+        // Se espera a la API: si el servidor no es el de la app, no arranca
+        url: 'http://127.0.0.1:8099/api/partidas',
         reuseExistingServer: true,
         timeout: 30000,
     },
