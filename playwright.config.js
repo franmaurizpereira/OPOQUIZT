@@ -13,12 +13,16 @@ const RUTAS_CHROMIUM = [
 
 const chromium = RUTAS_CHROMIUM.find((ruta) => fs.existsSync(ruta));
 
+// Puerto del servidor de pruebas. Es distinto del de la aplicación (8099)
+// para que las pruebas no toquen el historial real de la persona.
+const PUERTO_PRUEBAS = 8100;
+
 module.exports = defineConfig({
     testDir: './tests',
     timeout: 60000,
     reporter: [['list']],
     use: {
-        baseURL: 'http://127.0.0.1:8099',
+        baseURL: `http://127.0.0.1:${PUERTO_PRUEBAS}`,
         headless: true,
         launchOptions: {
             // Si no se encuentra ningún Chromium propio, se usa el que trae Playwright
@@ -27,10 +31,15 @@ module.exports = defineConfig({
         },
     },
     webServer: {
-        // Servidor de OPOQUIZ: sirve la interfaz y expone la API del historial
-        command: 'python3 backend/server.py --port 8099',
+        // Servidor de OPOQUIZ: sirve la interfaz y expone la API del historial.
+        // Las pruebas usan su propio fichero de historial para no tocar el
+        // historial real de la persona.
+        command: `python3 backend/server.py --port ${PUERTO_PRUEBAS}`,
+        env: {
+            OPOQUIZ_HISTORIAL: 'data/partidas-test.json',
+        },
         // Se espera a la API: si el servidor no es el de la app, no arranca
-        url: 'http://127.0.0.1:8099/api/partidas',
+        url: `http://127.0.0.1:${PUERTO_PRUEBAS}/api/partidas`,
         reuseExistingServer: true,
         timeout: 30000,
     },

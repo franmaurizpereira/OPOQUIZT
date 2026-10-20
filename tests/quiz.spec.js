@@ -5,8 +5,12 @@ const fs = require('fs');
 const path = require('path');
 const { test, expect } = require('@playwright/test');
 
-// Fichero con el historial de partidas (lo escribe el servidor de la app)
-const RUTA_HISTORIAL = path.join(__dirname, '..', 'data', 'partidas.json');
+// Fichero con el historial de partidas de las PRUEBAS. El historial real de
+// la persona está en data/partidas.json y las pruebas no lo tocan.
+const RUTA_HISTORIAL = path.join(__dirname, '..', 'data', 'partidas-test.json');
+
+// Fichero con el historial real: solo se lee, para comprobar que no cambia
+const RUTA_HISTORIAL_REAL = path.join(__dirname, '..', 'data', 'partidas.json');
 
 /**
  * Escribe el historial con las partidas indicadas y espera a que el servidor
@@ -24,6 +28,25 @@ function escribirHistorial(partidas) {
 /** Construye una entrada de historial con la fecha indicada. */
 function partida(fecha, aciertos, fallos) {
     return { fecha, aciertos, fallos };
+}
+
+/**
+ * Devuelve el índice (en el DOM) de la opción correcta de la pregunta visible.
+ * El orden de las preguntas y de las opciones cambia en cada partida, así que
+ * la opción correcta se localiza por su texto y no por su posición.
+ */
+async function indiceOpcionCorrecta(page) {
+    return page.evaluate(() => {
+        const bloque = document.querySelector('.quizlib-question:not(.oculto)');
+        const enunciado = bloque.querySelector('.quizlib-question-title').textContent;
+        const pregunta = quizData.find((p) => p.pregunta === enunciado);
+        if (!pregunta) return 0;
+        const textoCorrecto = pregunta.opciones[pregunta.correcta].replace(/^[A-D]\)\s*/, '');
+        const opciones = Array.from(bloque.querySelectorAll('.opcion-texto'));
+        return opciones.findIndex(
+            (o) => o.textContent.replace(/^[A-D]\)\s*/, '') === textoCorrecto
+        );
+    });
 }
 
 test.describe('Datos del quiz (js/quiz.js)', () => {
@@ -105,8 +128,10 @@ test.describe('Comportamiento del quiz', () => {
     });
 
     test('al responder se marca la correcta en verde y la fallada en rojo', async ({ page }) => {
-        const correcta = await page.evaluate(() => quizData[0].correcta);
-        const indiceIncorrecta = correcta === 0 ? 1 : 0;
+        // La posición de la opción correcta cambia en cada partida: se localiza
+        // por su texto
+        const indiceCorrecta = await indiceOpcionCorrecta(page);
+        const indiceIncorrecta = indiceCorrecta === 0 ? 1 : 0;
 
         // Se elige deliberadamente una opción incorrecta
         await page.locator('.quizlib-question:visible .opcion').nth(indiceIncorrecta).click();
@@ -119,22 +144,22 @@ test.describe('Comportamiento del quiz', () => {
 
         // La opción en verde debe ser la correcta según los datos
         const indiceVerde = await page.evaluate(() => {
-            const bloque = document.querySelectorAll('.quizlib-question')[0];
+            const bloque = document.querySelector('.quizlib-question:not(.oculto)');
             const opciones = bloque.querySelectorAll('.opcion');
             return Array.prototype.indexOf.call(
                 opciones,
                 bloque.querySelector('.opcion.quizlib-correct')
             );
         });
-        expect(indiceVerde).toBe(correcta);
+        expect(indiceVerde).toBe(indiceCorrecta);
 
         // Se muestra la explicación
         await expect(page.locator('.quizlib-question:visible .explicacion:visible')).toHaveCount(1);
     });
 
     test('al acertar no se marca ninguna opción en rojo', async ({ page }) => {
-        const correcta = await page.evaluate(() => quizData[0].correcta);
-        await page.locator('.quizlib-question:visible .opcion').nth(correcta).click();
+        const indiceCorrecta = await indiceOpcionCorrecta(page);
+        await page.locator('.quizlib-question:visible .opcion').nth(indiceCorrecta).click();
         await expect(page.locator('.quizlib-question:visible .opcion.quizlib-correct')).toHaveCount(1);
         await expect(page.locator('.quizlib-question:visible .opcion.quizlib-incorrect')).toHaveCount(0);
     });
@@ -249,5 +274,147 @@ test.describe('Historial de partidas', () => {
         const guardada = JSON.parse(fs.readFileSync(RUTA_HISTORIAL, 'utf-8')).partidas[0];
         expect(guardada.aciertos + guardada.fallos).toBe(30);
         expect(guardada.fecha).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);
+    });
+
+    test('la puntuación registrada es la real: aciertos y fallos suman 30', async ({ page }) => {
+        escribirHistorial([]);
+
+        await page.goto('/index.html');
+        await page.getByRole('button', { name: 'EMPEZAR PARTIDA' }).click();
+
+        // Se aciertan 24 preguntas de 30: se elige la opción correcta en 24
+        // y una incorrecta en las 6 restantes
+        for (let i = 0; i < 30; i++) {
+            const indice = await page.evaluate(() => {
+                const bloque = document.querySelector('.quizlib-question:not(.oculto)');
+                const opciones = Array.from(bloque.querySelectorAll('.opcion-texto'));
+                const enunciado = bloque.querySelector('.quizlib-question-title').textContent;
+                const pregunta = quizData.find((p) => p.pregunta === enunciado);
+                if (!pregunta) return 0;
+                // El texto de la opción correcta, sin la letra que se muestra
+                const textoCorrecto = pregunta.opciones[pregunta.correcta].replace(/^[A-D]\)\s*/, '');
+                return opciones.findIndex((op) => op.textContent.replace(/^[A-D]\)\s*/, '') === textoCorrecto);
+            });
+
+            // 6 preguntas se fallan a propósito
+            const aFallar = i % 5 === 0;
+            const eleccion = aFallar ? (indice + 1) % 4 : indice;
+            await page.locator('.quizlib-question:visible .opcion').nth(eleccion).click();
+
+            const boton = page.locator('#boton-siguiente');
+            await expect(boton).toBeVisible();
+            await boton.click();
+        }
+
+        const esperado = await page.locator('#resultado-puntuacion').textContent();
+        await expect(esperado).toContain('24 / 30');
+
+        await expect.poll(() => {
+            const datos = JSON.parse(fs.readFileSync(RUTA_HISTORIAL, 'utf-8'));
+            return datos.partidas.length ? datos.partidas[0].aciertos : -1;
+        }).toBe(24);
+
+        const guardada = JSON.parse(fs.readFileSync(RUTA_HISTORIAL, 'utf-8')).partidas[0];
+        expect(guardada.aciertos).toBe(24);
+        expect(guardada.fallos).toBe(6);
+    });
+});
+
+test.describe('Partidas sin repeticiones y con orden variable', () => {
+    /**
+     * Juega una partida entera y devuelve los enunciados y las opciones que
+     * se han ido viendo.
+     */
+    async function jugarPartida(page) {
+        await page.goto('/index.html');
+        await page.getByRole('button', { name: 'EMPEZAR PARTIDA' }).click();
+
+        const vistos = [];
+        for (let i = 0; i < 30; i++) {
+            const datos = await page.evaluate(() => {
+                const bloque = document.querySelector('.quizlib-question:not(.oculto)');
+                return {
+                    enunciado: bloque.querySelector('.quizlib-question-title').textContent,
+                    opciones: Array.from(bloque.querySelectorAll('.opcion-texto')).map((o) => o.textContent)
+                };
+            });
+            vistos.push(datos);
+
+            await page.locator('.quizlib-question:visible .opcion').first().click();
+            const boton = page.locator('#boton-siguiente');
+            await expect(boton).toBeVisible();
+            await boton.click();
+        }
+
+        return vistos;
+    }
+
+    test('en una partida no se repite ninguna pregunta ni ninguna opción', async ({ page }) => {
+        const vistos = await jugarPartida(page);
+
+        const enunciados = vistos.map((v) => v.enunciado);
+        expect(new Set(enunciados).size, 'enunciados repetidos').toBe(30);
+
+        const opciones = vistos.flatMap((v) => v.opciones);
+        expect(new Set(opciones).size, 'opciones repetidas').toBe(opciones.length);
+    });
+
+    test('dos partidas consecutivas tienen un orden distinto', async ({ page }) => {
+        const primera = await jugarPartida(page);
+        const segunda = await jugarPartida(page);
+
+        const ordenPrimero = primera.map((v) => v.enunciado);
+        const ordenSegundo = segunda.map((v) => v.enunciado);
+
+        expect(ordenPrimero).not.toEqual(ordenSegundo);
+    });
+
+    test('en dos partidas cambia la posición de alguna respuesta correcta', async ({ page }) => {
+        // Para cada pregunta se anota con qué letra se muestra su respuesta
+        // correcta. El texto es siempre el mismo; la letra debe cambiar
+        const letras = async () => {
+            await page.goto('/index.html');
+            await page.getByRole('button', { name: 'EMPEZAR PARTIDA' }).click();
+            return page.evaluate(() => {
+                const mapa = {};
+                document.querySelectorAll('.quizlib-question').forEach((bloque) => {
+                    const enunciado = bloque.querySelector('.quizlib-question-title').textContent;
+                    const pregunta = quizData.find((p) => p.pregunta === enunciado);
+                    if (!pregunta) return;
+                    const textoCorrecto = pregunta.opciones[pregunta.correcta]
+                        .replace(/^[A-D]\)\s*/, '');
+                    const opciones = Array.from(bloque.querySelectorAll('.opcion-texto'));
+                    const indice = opciones.findIndex(
+                        (o) => o.textContent.replace(/^[A-D]\)\s*/, '') === textoCorrecto
+                    );
+                    mapa[enunciado] = indice;
+                });
+                return mapa;
+            });
+        };
+
+        const primera = await letras();
+        const segunda = await letras();
+
+        const cambiadas = Object.keys(primera).filter(
+            (enunciado) => primera[enunciado] !== segunda[enunciado]
+        );
+        expect(cambiadas.length, 'ninguna respuesta correcta mantiene su posición').toBeGreaterThan(0);
+    });
+
+    test('las pruebas no tocan el historial real de la persona', async () => {
+        const antes = fs.existsSync(RUTA_HISTORIAL_REAL)
+            ? fs.readFileSync(RUTA_HISTORIAL_REAL, 'utf-8')
+            : null;
+
+        // Se provoke el registro de una partida en el fichero de pruebas
+        escribirHistorial([]);
+        fs.writeFileSync(RUTA_HISTORIAL, JSON.stringify({ partidas: [partida('2026-01-12T10:00:00', 21, 9)] }), 'utf-8');
+
+        const despues = fs.existsSync(RUTA_HISTORIAL_REAL)
+            ? fs.readFileSync(RUTA_HISTORIAL_REAL, 'utf-8')
+            : null;
+
+        expect(despues).toBe(antes);
     });
 });

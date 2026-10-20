@@ -81,6 +81,21 @@ La pantalla de inicio muestra las **5 partidas más recientes** con su fecha
 - Se registra automáticamente al terminar cada partida.
 - Para vaciarlo: `rm data/partidas.json`.
 - La base de datos **no** se toca: no hay ninguna tabla para el historial.
+- Las **pruebas automáticas** usan su propio fichero (`data/partidas-test.json`)
+  y su propio puerto (8100): nunca tocan tu historial.
+
+## Cada partida es distinta
+
+Al empezar cada partida se **mezclan** el orden de las preguntas y el de las
+opciones de cada una, así que la respuesta correcta no siempre está en la
+misma posición. El banco (`js/quiz.js`) no se modifica: la mezcla se hace en
+el navegador al construir la partida.
+
+El banco de preguntas se revisa con:
+```bash
+.venv/bin/python backend/reparar_quiz.py            # informa de solapamientos
+.venv/bin/python backend/reparar_quiz.py --reparar  # los sustituye por nuevas
+```
 
 ## Agentes (flujo SDD)
 

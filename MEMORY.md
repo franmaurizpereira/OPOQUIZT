@@ -3,10 +3,10 @@
 > Solo datos no sensibles: las credenciales viven en `credencial.yaml` (ignorado
 > por git). Plantilla en `credencial.example.yaml`.
 
-## Estado actual (v1 + historial funcionando)
+## Estado actual (v1 + historial + partidas variables)
 - Flujo completo: 9 PDF → extracción → troceado → embeddings → **2555 chunks**
   (2090 texto / 465 tabla) en PostgreSQL 18 + pgvector 0.8.0 → **30 preguntas**
-  en `js/quiz.js` → frontend retro 80s → `npx playwright test` **12/12 ✅**.
+  en `js/quiz.js` → frontend retro 80s → `npx playwright test` **17/17 ✅**.
 - Modelos Ollama: `locusai/all-minilm-l6-v2:latest` (embeddings, 384 dims) y
   `qwen3.8:27b` (preguntas: ~60 s por lote de 3 → ~20 min el total).
 
@@ -38,7 +38,13 @@
   el usuario decidió **no** crear tabla en PostgreSQL. Como el navegador no
   puede escribir ficheros, `backend/server.py` sirve la interfaz y expone
   `GET/POST /api/partidas`. Se muestran las 5 últimas: fecha `dd/mm/aaaa`,
-  aciertos en verde y fallos en rojo.
+  aciertos en verde y fallos en rojo. Las pruebas usan otro fichero y otro
+  puerto (`OPOQUIZ_HISTORIAL` + 8100) para no tocar el historial real.
+- **Cada partida se mezcla** (spec 002): se barajan el orden de las preguntas
+  y el de las opciones (recalculando `correcta` y renumerando A/B/C/D) sobre
+  una copia de `quizData`, que no se modifica. En el banco no puede haber dos
+  preguntas con las mismas opciones: `deduplicar()` y `backend/reparar_quiz.py`
+  lo comprueban por opciones, por enunciado y por texto de respuesta correcta.
 - **Skill `frontend-design` adaptada a OPOQUIZ** (en español, retro 80s), sin
   `skills-lock.json` para que `npx skills update` no la pise (original en
   `UPSTREAM.md`).
@@ -56,6 +62,10 @@
   `backend/server.py`, que solo publica la interfaz.
 - **Reiniciar el servidor tras tocar el backend**: el módulo queda importado
   en memoria y los cambios no se ven (pasó con `historial.py`).
+- **Las pruebas automáticas no deben escribir en el historial real**: si lo
+  hacen, la puntuación de la persona aparece sustituida por la de las pruebas
+  (pasó: se veían 9 aciertos en lugar del 80 % real). Hoy se aíslan con
+  `OPOQUIZ_HISTORIAL` y el puerto 8100.
 - Procesos en segundo plano: el equipo reinició y los mató. Usar `setsid` +
   log en `logs/`, nunca `/tmp`. `npx add-mcp` y `npx skills add` son
   interactivos: fallan sin TTY.

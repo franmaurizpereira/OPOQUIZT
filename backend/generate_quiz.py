@@ -401,18 +401,68 @@ def validar_pregunta(item, contexto):
     }
 
 
+def _similitud_opciones(opciones_a, opciones_b):
+    """Proporción de opciones de A que aparecen (como texto) en B (0 a 1)."""
+    def textos(opciones):
+        return {_limpiar_texto(o) for o in opciones if _limpiar_texto(o)}
+
+    ta = textos(opciones_a)
+    tb = textos(opciones_b)
+    if not ta or not tb:
+        return 0.0
+    return len(ta & tb) / len(ta)
+
+
+def _mismo_texto_correcto(pregunta_a, pregunta_b):
+    """Indica si dos preguntas tienen exactamente el mismo texto correcto."""
+    correcta_a = pregunta_a["opciones"][pregunta_a["correcta"]]
+    correcta_b = pregunta_b["opciones"][pregunta_b["correcta"]]
+    return _limpiar_texto(correcta_a) == _limpiar_texto(correcta_b)
+
+
+def _son_duplicadas(pregunta_a, pregunta_b, umbral=0.5):
+    """Decide si dos preguntas son en realidad la misma.
+
+    Tres señales: el mismo conjunto de opciones, enunciados casi iguales o
+    la misma respuesta correcta con enunciados parecidos (el caso más
+    traicionero: el jugador ve la misma solución dos veces).
+    """
+    if _similitud_opciones(pregunta_a["opciones"], pregunta_b["opciones"]) >= umbral:
+        return True
+
+    if _similitud_enunciados(pregunta_a["pregunta"], pregunta_b["pregunta"]) >= 0.6:
+        return True
+
+    if (
+        _mismo_texto_correcto(pregunta_a, pregunta_b)
+        and _similitud_enunciados(pregunta_a["pregunta"], pregunta_b["pregunta"]) >= 0.3
+    ):
+        return True
+
+    return False
+
+
+def _similitud_enunciados(enunciado_a, enunciado_b):
+    """Similitud de Jaccard entre dos enunciados."""
+    pa = _palabras_significativas(enunciado_a)
+    pb = _palabras_significativas(enunciado_b)
+    if not pa or not pb:
+        return 0.0
+    return len(pa & pb) / len(pa | pb)
+
+
 def deduplicar(preguntas, umbral=0.6):
-    """Elimina preguntas demasiado parecidas entre sí."""
+    """Elimina preguntas demasiado parecidas entre sí.
+
+    Se comparan el enunciado, el conjunto de opciones y el texto de la
+    respuesta correcta: una pregunta redactada de otra forma pero con las
+    mismas opciones es, para el jugador, la misma pregunta.
+    """
     unicas = []
     for pregunta in preguntas:
         repetida = False
-        palabras = _palabras_significativas(pregunta["pregunta"])
         for otra in unicas:
-            palabras_otra = _palabras_significativas(otra["pregunta"])
-            if not palabras or not palabras_otra:
-                continue
-            jaccard = len(palabras & palabras_otra) / len(palabras | palabras_otra)
-            if jaccard >= umbral:
+            if _son_duplicadas(pregunta, otra, umbral=0.5):
                 repetida = True
                 break
         if not repetida:

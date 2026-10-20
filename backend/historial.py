@@ -22,8 +22,12 @@ from pathlib import Path
 
 import config
 
-# Fichero con el historial (estado local del equipo, ignorado por git)
-RUTA_HISTORIAL = config.RAIZ / "data" / "partidas.json"
+# Fichero con el historial (estado local del equipo, ignorado por git).
+# La variable de entorno OPOQUIZ_HISTORIAL permite usar otro fichero, por
+# ejemplo en las pruebas automáticas, para no tocar el historial real.
+RUTA_HISTORIAL = Path(
+    os.environ.get("OPOQUIZ_HISTORIAL") or (config.RAIZ / "data" / "partidas.json")
+)
 
 # Número máximo de partidas que se conservan en el fichero
 MAX_PARTIDAS = 100

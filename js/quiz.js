@@ -96,10 +96,10 @@ const quizData = [
         explicacion: "El texto del punto 9.a menciona de forma explícita a los países africanos, los países menos adelantados, los países en desarrollo sin litoral y los pequeños Estados insulares en desarrollo como destinatarios del mayor apoyo financiero, tecnológico y técnico. Las opciones incorrectas sustituyen alguno de estos grupos por categorías no contempladas en el texto, como países industrializados, países costeros o grandes Estados continentales."
     },
     {
-        pregunta: "De acuerdo con el artículo 37.2 del TREBEP, queda excluida de la obligatoriedad de la negociación colectiva:",
-        opciones: [ "A) Los criterios generales sobre ofertas de empleo público", "B) Los criterios generales de Acción Social", "C) Las decisiones de las Administraciones Públicas que afecten a sus potestades de organización", "D) Las propuestas sobre derechos sindicales y de participación" ],
+        pregunta: "¿Qué artículos de la Constitución Española regulan la composición del Tribunal Constitucional?",
+        opciones: [ "A) Los artículos 157 y 158", "B) Los artículos 161 y 162", "C) Los artículos 159 y 160", "D) Los artículos 155 y 156" ],
         correcta: 2,
-        explicacion: "El texto indica que las materias excluidas de la obligatoriedad de la negociación, según el artículo 37.2 TREBEP, son «las decisiones de las Administraciones Públicas que afecten a sus potestades de organización». En cambio, los criterios generales sobre ofertas de empleo público, las propuestas sobre derechos sindicales y de participación, y los criterios generales de Acción Social figuran entre las materias que sí están sujetas a negociación colectiva."
+        explicacion: "El contexto indica expresamente que la composición del Tribunal Constitucional se regula en los artículos 159 y 160 de la Constitución Española. Las demás opciones presentan números de artículos cercanos pero incorrectos, que no corresponden a la regulación de la composición del Tribunal Constitucional."
     },
     {
         pregunta: "En el supuesto de discapacidad del hijo o hija, el permiso de nacimiento se ampliará para ambos progenitores en:",
@@ -114,10 +114,10 @@ const quizData = [
         explicacion: "El documento establece expresamente que las reuniones del foro serán convocadas por el Presidente del Consejo Económico y Social antes de las reuniones del foro político de alto nivel bajo los auspicios del Consejo, o bien en conjunción con otros foros o conferencias. Las demás opciones no aparecen como convocantes en el texto."
     },
     {
-        pregunta: "¿Cuál de las siguientes materias queda excluida de la obligatoriedad de la negociación colectiva en el ámbito de la función pública?",
-        opciones: [ "A) Los criterios generales de Acción Social", "B) Las propuestas sobre derechos sindicales y de participación", "C) Las decisiones de las Administraciones Públicas que afecten a sus potestades de organización", "D) Los criterios generales sobre ofertas de empleo público" ],
+        pregunta: "¿Quién elabora el Plan de Acceso a Internet en el marco de las políticas de impulso de los derechos digitales?",
+        opciones: [ "A) El Gobierno, de manera unilateral y sin intervención autonómica", "B) Las comunidades autónomas, de forma exclusiva e independiente del Gobierno", "C) El Gobierno, en colaboración con las comunidades autónomas", "D) El Gobierno, en coordinación con las entidades privadas del sector tecnológico" ],
         correcta: 2,
-        explicacion: "El artículo 37.2 TREBEP señala como materia excluida de la obligatoriedad de la negociación las decisiones de las Administraciones Públicas que afecten a sus potestades de organización. Por el contrario, los criterios generales de Acción Social, las propuestas sobre derechos sindicales y de participación, y los criterios generales sobre ofertas de empleo público figuran entre las materias que sí están sujetas a negociación obligatoria."
+        explicacion: "El texto establece expresamente que 'El Gobierno, en colaboración con las comunidades autónomas, elaborará un Plan de Acceso a Internet'. Por tanto, la elaboración es una tarea conjunta entre el Gobierno central y las comunidades autónomas, no unilateral del Gobierno, no exclusiva de las comunidades autónomas, ni en coordinación con entidades privadas."
     },
     {
         pregunta: "Cuando las instrucciones u órdenes profesionales de un superior constituyen una infracción manifiesta del ordenamiento jurídico, el empleado público deberá:",
@@ -132,10 +132,10 @@ const quizData = [
         explicacion: "El texto señala como falta muy grave la tolerancia de los superiores respecto de la comisión de faltas muy graves o graves de sus subordinados. Las opciones incorrectas sustituyen 'muy graves' por 'leves' o cambian 'subordinados' por 'compañeros', lo cual no se corresponde con lo establecido."
     },
     {
-        pregunta: "¿A qué Ministerio está adscrito el Consejo de Transparencia y Buen Gobierno, creado como organismo público al amparo de la disposición adicional décima de la Ley 6/1997?",
-        opciones: [ "A) Al Ministerio de Justicia y Administraciones Públicas", "B) Al Ministerio de Hacienda y Administraciones Públicas", "C) Al Ministerio de la Presidencia y para las Administraciones Públicas", "D) Al Ministerio de Economía y Hacienda" ],
-        correcta: 1,
-        explicacion: "El artículo 33.1 del texto indica expresamente que el Consejo de Transparencia y Buen Gobierno estará adscrito al Ministerio de Hacienda y Administraciones Públicas, y que se crea como organismo público de los previstos en la disposición adicional décima de la Ley 6/1997, de 14 de abril, de Organización y Funcionamiento de la Administración General del Estado."
+        pregunta: "¿Cuál es el umbral de renta diaria que se utiliza como referencia para definir la pobreza extrema en el Objetivo 1.1 de la Agenda 2030?",
+        opciones: [ "A) Menos de 1,25 dólares de los Estados Unidos al día", "B) Menos de 0,99 dólares de los Estados Unidos al día", "C) Menos de 2,00 dólares de los Estados Unidos al día", "D) Menos de 1,90 dólares de los Estados Unidos al día" ],
+        correcta: 0,
+        explicacion: "El texto establece expresamente que, en el marco del Objetivo 1.1, «actualmente se considera que sufren pobreza extrema las personas que viven con menos de 1,25 dólares de los Estados Unidos al día». Las demás opciones (1,90; 2,00 y 0,99 dólares) no aparecen en el documento y contradicen el dato concreto indicado."
     },
     {
         pregunta: "¿Cuántos objetivos de desarrollo sostenible contiene la Agenda 2030 aprobada en la Cumbre del Desarrollo Sostenible de septiembre de 2015?",
@@ -144,10 +144,10 @@ const quizData = [
         explicacion: "El texto señala de forma explícita que la Agenda 2030, aprobada en la Cumbre del Desarrollo Sostenible de septiembre de 2015, contiene 17 objetivos de desarrollo sostenible de aplicación universal, que desde el 1 de enero de 2016 rigen los esfuerzos de los países para lograr un mundo sostenible en el año 2030."
     },
     {
-        pregunta: "¿En qué condiciones se establece la transferencia a los países en desarrollo de tecnologías ecológicamente racionales?",
-        opciones: [ "A) En condiciones exclusivamente comerciales determinadas por organismos internacionales", "B) En condiciones favorables, e incluso en condiciones concesionarias y preferenciales establecidas de mutuo acuerdo", "C) En condiciones unilaterales fijadas por los países desarrollados donantes", "D) En condiciones de exclusividad vinculadas a acuerdos bilaterales de libre comercio" ],
-        correcta: 1,
-        explicacion: "El texto indica expresamente que la transferencia de tecnologías ecológicamente racionales a los países en desarrollo se realizará «en condiciones favorables, e incluso en condiciones concesionarias y preferenciales establecidas de mutuo acuerdo», lo que descarta las opciones de condiciones comerciales, unilaterales o de exclusividad."
+        pregunta: "¿Cuál es el plazo general establecido para la emisión de informes en el procedimiento administrativo, salvo que una disposición o el cumplimiento del resto de plazos permita o exija otro plazo mayor o menor?",
+        opciones: [ "A) Cinco días", "B) Quince días", "C) Veinte días", "D) Diez días" ],
+        correcta: 3,
+        explicacion: "El artículo 80.2 de la Ley 39/2015 establece expresamente que los informes serán emitidos a través de medios electrónicos y de acuerdo con los requisitos del artículo 26 en el plazo de diez días, salvo que una disposición o el cumplimiento del resto de los plazos del procedimiento permita o exija otro plazo mayor o menor."
     },
     {
         pregunta: "¿Qué indicadores se busca aumentar considerablemente de aquí a 2030 en materia de investigación y desarrollo?",

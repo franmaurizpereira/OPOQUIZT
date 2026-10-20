@@ -37,15 +37,74 @@
     let respondida = [];
     let quiz = null;
 
+    // Preguntas de la partida en curso (copia mezclada de quizData)
+    let partida = [];
+
+    /* ---------------------------------------------------------- mezclar */
+
+    /**
+     * Mezcla el orden de las preguntas y el de las opciones de cada una.
+     *
+     * Se trabaja sobre una copia: `quizData` (js/quiz.js) no se modifica,
+     * así que cada partida tiene su propio orden y la respuesta correcta no
+     * ocupa siempre la misma posición.
+     */
+    function mezclarPartida(preguntas) {
+        const mezcladas = preguntas.map(function (pregunta) {
+            return {
+                pregunta: pregunta.pregunta,
+                opciones: pregunta.opciones.slice(),
+                correcta: pregunta.correcta,
+                explicacion: pregunta.explicacion
+            };
+        });
+
+        // Se barajan las opciones de cada pregunta y se recalcula la correcta
+        mezcladas.forEach(function (pregunta) {
+            // Se quita el prefijo "A) ".."D) " para poder reordenar y después
+            // volver a numerar las opciones en su nuevo orden
+            const textos = pregunta.opciones.map(function (opcion) {
+                return opcion.replace(/^[A-D]\)\s*/, '');
+            });
+            const textoCorrecto = textos[pregunta.correcta];
+
+            for (let i = textos.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                const temporal = textos[i];
+                textos[i] = textos[j];
+                textos[j] = temporal;
+            }
+
+            // Se vuelven a numerar las opciones (A, B, C, D) en el nuevo orden
+            pregunta.opciones = textos.map(function (texto, i) {
+                return LETRAS[i].toUpperCase() + ') ' + texto;
+            });
+            pregunta.correcta = textos.indexOf(textoCorrecto);
+        });
+
+        // Se baraja el orden de las preguntas
+        for (let i = mezcladas.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const temporal = mezcladas[i];
+            mezcladas[i] = mezcladas[j];
+            mezcladas[j] = temporal;
+        }
+
+        return mezcladas;
+    }
+
     /* --------------------------------------------------------- construir */
 
     /**
      * Vuelca las preguntas en el DOM con la estructura que espera quizlib.
+     * Cada partida se construye con las preguntas y las opciones mezcladas.
      */
     function construirPreguntas() {
         contenedor.innerHTML = '';
 
-        quizData.forEach(function (pregunta, i) {
+        partida = mezclarPartida(quizData);
+
+        partida.forEach(function (pregunta, i) {
             const bloque = document.createElement('div');
             bloque.className = 'quizlib-question' + (i === 0 ? '' : ' oculto');
             bloque.setAttribute('data-indice', String(i));
@@ -99,7 +158,7 @@
 
         // Instancia de la librería: recibe el identificador del contenedor y
         // el array con la respuesta correcta de cada pregunta
-        quiz = new Quiz('contenedor-quiz', quizData.map(function (pregunta) {
+        quiz = new Quiz('contenedor-quiz', partida.map(function (pregunta) {
             return LETRAS[pregunta.correcta];
         }));
         quiz.unansweredQuestionText = 'Pregunta sin responder';
@@ -118,7 +177,7 @@
         // La librería comprueba todas las preguntas del contenedor
         quiz.checkAnswers(false);
 
-        quizData.forEach(function (pregunta, i) {
+        partida.forEach(function (pregunta, i) {
             const bloque = contenedor.querySelector('.quizlib-question[data-indice="' + i + '"]');
             if (!bloque) {
                 return;
@@ -348,7 +407,7 @@
         }
 
         respondida[actual] = true;
-        if (LETRAS.indexOf(entrada.value) === quizData[actual].correcta) {
+        if (LETRAS.indexOf(entrada.value) === partida[actual].correcta) {
             aciertos += 1;
         }
 
