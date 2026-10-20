@@ -18,6 +18,12 @@ luego el suyo propio.
 | Implementer | `implementer.md` | Escribe el código según el plan aprobado. |
 | Reviewer | `reviewer.md` | Valida el resultado contra los criterios de aceptación. **No corrige, reporta.** |
 
+Los ficheros viven en `.pi/agents/` y están registrados como plantillas de
+prompt en `.pi/settings.json`, así que en Pi se invocan como comandos:
+`/planner`, `/coordinator`, `/implementer` y `/reviewer`.
+El trabajo se apoya en el flujo de specs de `specs/` (spec.md → plan.md →
+tasks.md), described en `specs/README.md`.
+
 ## 3. Flujo de trabajo obligatorio
 Solicitud → PLANNER (plan) → COORDINATOR (asigna) → IMPLEMENTER (código)
 → REVIEWER (veredicto) → COORDINATOR (cierra o reabre)

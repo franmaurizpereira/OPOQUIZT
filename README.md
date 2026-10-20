@@ -64,6 +64,22 @@ variable de entorno `CHROMIUM_PATH`.
 - `mcp.json` no contiene claves: la de Context7 se toma de la variable de
   entorno `CONTEXT7_API_KEY`.
 
+## Agentes (flujo SDD)
+
+El proyecto se desarrolla con 4 agentes, cada uno con su fichero de
+instrucciones en `.pi/agents/`. Están registrados en `.pi/settings.json`
+como plantillas de prompt, de modo que en Pi se invocan como comandos:
+
+| Comando | Fichero | Qué hace |
+|---|---|---|
+| `/planner` | `.pi/agents/planner.md` | Redacta la spec, el plan y las tareas (no escribe código) |
+| `/coordinator` | `.pi/agents/coordinator.md` | Dirige el flujo, asigna tareas y actualiza `MEMORY.md` |
+| `/implementer` | `.pi/agents/implementer.md` | Implementa **una** tarea aprobada, con los tests primero |
+| `/reviewer` | `.pi/agents/reviewer.md` | Valida contra los criterios y emite veredicto (no corrige) |
+
+El trabajo se apoya en `specs/NNN-nombre/`, con `spec.md` (qué y por qué),
+`plan.md` (cómo) y `tasks.md` (tareas). Ver `specs/README.md` y `AGENTS.md`.
+
 ## Estructura
 
 ```
@@ -88,10 +104,12 @@ variable de entorno `CHROMIUM_PATH`.
 ├── AGENTS.md                  ← reglas de orquestación de agentes
 ├── MEMORY.md                  ← estado del proyecto y decisiones
 ├── .pi/agents/                ← planner / coordinator / implementer / reviewer
+├── .pi/settings.json          ← registra los agentes como comandos de Pi
 ├── .agents/skills/            ← skills del proyecto (frontend-design)
+├── specs/                     ← specs del flujo SDD (spec.md, plan.md, tasks.md)
 ├── pdfs/                      ← PDF de origen
 ├── credencial.example.yaml    ← plantilla de credenciales (la real se ignora)
-└── requirements.txt
+└── requirements.txt           ← dependencias Python
 ```
 
 ## Notas de diseño
