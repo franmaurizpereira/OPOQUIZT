@@ -289,6 +289,26 @@ body::after {
     margin: 0 auto;
 }
 
+/* Variante secundaria: acento cian para acciones alternativas */
+.boton-secundario {
+    background: var(--neon-cian);
+    box-shadow: var(--sombra-dura), inset 0 2px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* Fila de botones de la pantalla final */
+.botones-final {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    justify-content: center;
+    align-items: center;
+    margin-top: 26px;
+}
+
+.botones-final .boton-grande {
+    margin: 0;
+}
+
 .controles {
     margin-top: 24px;
     text-align: center;

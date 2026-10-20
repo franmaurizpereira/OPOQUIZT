@@ -185,6 +185,60 @@ test.describe('Comportamiento del quiz', () => {
         await expect(page.locator('.quizlib-question:visible')).toHaveCount(1);
     });
 
+    test('el botón INICIO vuelve a la pantalla de inicio desde el fin de partida', async ({ page }) => {
+        await page.goto('/index.html');
+        await page.getByRole('button', { name: 'EMPEZAR PARTIDA' }).click();
+
+        for (let i = 0; i < 30; i += 1) {
+            await page.locator('.quizlib-question:visible .opcion').first().click();
+            const boton = page.locator('#boton-siguiente');
+            await expect(boton).toBeVisible();
+            await boton.click();
+        }
+
+        // Pantalla final con los dos botones
+        await expect(page.locator('#pantalla-final')).toBeVisible();
+        await expect(page.locator('#boton-reiniciar')).toBeVisible();
+        await expect(page.locator('#boton-inicio')).toBeVisible();
+        await expect(page.locator('#boton-inicio')).toHaveText('INICIO');
+
+        // El botón INICIO vuelve a la pantalla de inicio
+        await page.locator('#boton-inicio').click();
+        await expect(page.locator('#pantalla-inicio')).toBeVisible();
+        await expect(page.locator('#pantalla-quiz')).toBeHidden();
+        await expect(page.locator('#pantalla-final')).toBeHidden();
+        await expect(page.locator('#boton-empezar')).toBeVisible();
+    });
+
+    test('al volver a INICIO y empezar otra vez, la partida está limpia', async ({ page }) => {
+        await page.goto('/index.html');
+        await page.getByRole('button', { name: 'EMPEZAR PARTIDA' }).click();
+
+        // Se responden tres preguntas (una mal, para dejar aciertos y fallos)
+        await page.locator('.quizlib-question:visible .opcion').first().click();
+        await page.locator('#boton-siguiente').click();
+        await page.locator('.quizlib-question:visible .opcion').first().click();
+        await page.locator('#boton-siguiente').click();
+        await page.locator('.quizlib-question:visible .opcion').first().click();
+        await page.locator('#boton-siguiente').click();
+
+        // Se vuelve a la pantalla de inicio y se empieza otra partida
+        await page.goto('/index.html');
+        await page.getByRole('button', { name: 'EMPEZAR PARTIDA' }).click();
+
+        // Ni los aciertos ni las respuestas marcadas se heredan
+        await expect(page.locator('#contador-aciertos')).toHaveText('0');
+        await expect(page.locator('#pregunta-actual')).toHaveText('1');
+        await expect(page.locator('.quizlib-question:visible')).toHaveCount(1);
+        await expect(
+            page.locator('.quizlib-question:visible .opcion.quizlib-correct')
+        ).toHaveCount(0);
+        await expect(
+            page.locator('.quizlib-question:visible .opcion.quizlib-incorrect')
+        ).toHaveCount(0);
+        await expect(page.locator('.quizlib-question:visible .explicacion:visible')).toHaveCount(0);
+    });
+
     test('todos los textos visibles están en español', async ({ page }) => {
         const texto = await page.locator('body').innerText();
         const ingleses = ['Question', 'Answer', 'Score', 'Start', 'Next', 'Restart', 'Unanswered'];

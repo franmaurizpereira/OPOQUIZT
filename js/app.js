@@ -21,6 +21,7 @@
     const botonEmpezar = document.getElementById('boton-empezar');
     const botonSiguiente = document.getElementById('boton-siguiente');
     const botonReiniciar = document.getElementById('boton-reiniciar');
+    const botonInicio = document.getElementById('boton-inicio');
     const preguntaActual = document.getElementById('pregunta-actual');
     const preguntaTotal = document.getElementById('pregunta-total');
     const contadorAciertos = document.getElementById('contador-aciertos');
@@ -383,7 +384,22 @@
 
     /* --------------------------------------------------------- eventos */
 
+    /**
+     * Deja el juego como recién abierto: sin aciertos, sin respuestas marcadas
+     * y con las preguntas barajadas de nuevo.
+     */
+    function reiniciarPartida() {
+        indice = 0;
+        aciertos = 0;
+        respondida = [];
+        contadorAciertos.textContent = '0';
+        construirPreguntas();
+    }
+
     botonEmpezar.addEventListener('click', function () {
+        // Se reinicia siempre: así una partida nueva nunca hereda el estado
+        // de la anterior (por ejemplo, si se vuelve desde la pantalla final)
+        reiniciarPartida();
         pantallaInicio.classList.add('oculto');
         pantallaFinal.classList.add('oculto');
         pantallaQuiz.classList.remove('oculto');
@@ -426,14 +442,20 @@
 
     // Botón de reinicio: vuelve a empezar la partida desde el principio
     botonReiniciar.addEventListener('click', function () {
-        indice = 0;
-        aciertos = 0;
-        respondida = [];
-        contadorAciertos.textContent = '0';
-        construirPreguntas();
+        reiniciarPartida();
         pantallaFinal.classList.add('oculto');
         pantallaQuiz.classList.remove('oculto');
         mostrarPregunta(0);
+        // El historial se refresca para que la pantalla de inicio esté al día
+        cargarHistorial();
+    });
+
+    // Botón INICIO: vuelve a la pantalla de inicio sin seguir jugando
+    botonInicio.addEventListener('click', function () {
+        reiniciarPartida();
+        pantallaFinal.classList.add('oculto');
+        pantallaQuiz.classList.add('oculto');
+        pantallaInicio.classList.remove('oculto');
         // El historial se refresca para que la pantalla de inicio esté al día
         cargarHistorial();
     });
