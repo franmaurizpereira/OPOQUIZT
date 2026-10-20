@@ -21,5 +21,8 @@ logs/
 # Historial local de partidas (estado del equipo, no código)
 data/
 
+# PDF de origen: material de estudio local, no se versiona
+pdfs/
+
 # Sistema operativo
 .DS_Store
