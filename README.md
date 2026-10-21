@@ -71,6 +71,10 @@ psql -f backend/db.sql
 # 5. Generar las 30 preguntas y volcar js/quiz.js
 .venv/bin/python backend/generate_quiz.py
 
+# 5-bis. (Opcional) Generar el pool grande de preguntas para partidas distintas
+#           Con el modelo local tarda horas; con OPENROUTER_API_KEY, ~35 min
+.venv/bin/python backend/generate_quiz.py --pool 600
+
 # 6. Servir la web (interfaz + historial de partidas)
 .venv/bin/python backend/server.py --port 8099
 #   http://127.0.0.1:8099/index.html
@@ -85,6 +89,18 @@ resto del proyecto (credenciales, backend, repositorio) no es accesible.
 ```bash
 npm install          # instala @playwright/test
 npx playwright test  # valida los datos y el comportamiento del quiz
+```
+
+Las pruebas del pool (`tests/pool.spec.js`) comprueban que el frontend usa el
+pool cuando está disponible y que, si no lo está, sigue jugando con
+`js/quiz.js`. Los dos primeros tests exigen que `js/quiz_pool.json` exista
+con al menos 500 preguntas: si todavía no se ha generado, fallan.
+
+Las pruebas unitarias del generador del pool (sin necesidad de Ollama ni de
+la base de datos) se ejecutan con:
+
+```bash
+.venv/bin/python backend/test_pool.py
 ```
 
 Si Playwright no encuentra el Chromium del sistema, se indica la ruta con la
@@ -117,8 +133,58 @@ La pantalla de inicio muestra las **5 partidas más recientes** con su fecha
 
 Al empezar cada partida se **mezclan** el orden de las preguntas y el de las
 opciones de cada una, así que la respuesta correcta no siempre está en la
-misma posición. El banco (`js/quiz.js`) no se modifica: la mezcla se hace en
-el navegador al construir la partida.
+misma posición.
+
+Además, si existe el **pool de preguntas** (`js/quiz_pool.json`), cada partida
+sale de 30 preguntas elegidas al azar entre todas las del pool: es un examen
+distinto en cada partida. Si el pool no está o no se puede cargar, el quiz
+sigue funcionando con las 30 preguntas fijas de `js/quiz.js`.
+
+### Generar el pool de preguntas
+
+El pool se genera **una sola vez, offline**, con un modelo de lenguaje:
+
+```bash
+.venv/bin/python backend/generate_quiz.py --pool 600
+```
+
+- Genera hasta **600 preguntas** repartidas por los 9 PDF (ningún PDF puede
+  superar el 30 % del pool) y las deja en `js/quiz_pool.json`.
+- **El modelo puede ser local o remoto**:
+  - **Local** (por defecto): el modelo de Ollama `qwen3.8:27b`. Funciona sin
+    red, pero va lento: ~29 s por pregunta (unas 5 horas para 600).
+  - **Remoto (recomendado)**: si está definida la variable de entorno
+    `OPENROUTER_API_KEY`, se usa OpenRouter con el modelo gratuito
+    `minimax/minimax-m3.1-flash:free`: ~6 s por pregunta (unos 35 minutos).
+    La clave **no** se guarda en el repo:
+
+    ```bash
+    export OPENROUTER_API_KEY="sk-or-v1-..."
+    .venv/bin/python backend/generate_quiz.py --pool 600
+    ```
+
+- Se puede dejar corriendo en segundo plano:
+
+  ```bash
+  setsid .venv/bin/python backend/generate_quiz.py --pool 600 > logs/pool.log 2>&1 &
+  ```
+
+- **Es reanudable**: el progreso se guarda en `logs/pool_cache.json` cada 25
+  preguntas. Si se corta (Ctrl+C, reinicio, corte de luz), se relanza el mismo
+  comando y continúa donde lo dejó, sin repetir ni perder lo ya generado.
+- El pool se **publica a medias** en cada checkpoint, así que se puede jugar
+  mientras la generación sigue en marcha.
+- Para regenerarlo tras cambiar los PDF: se borra `logs/pool_cache.json` y
+  `js/quiz_pool.json`, y se vuelve a lanzar el comando.
+- Para comprobar el resultado:
+
+  ```bash
+  .venv/bin/python backend/verificar_pool.py
+  ```
+
+  Indica cuántas preguntas hay, el reparto por documento, que no haya
+  duplicados y que la respuesta correcta esté repartida entre las cuatro
+  opciones.
 
 El banco de preguntas se revisa con:
 ```bash
@@ -149,7 +215,8 @@ El trabajo se apoya en `specs/NNN-nombre/`, con `spec.md` (qué y por qué),
 ├── css/style.css              ← estilos retro (años 80)
 ├── js/
 │   ├── quizlib.min.js         ← librería de quiz (Quiz.Classes, checkAnswers)
-│   ├── quiz.js                ← datos de las 30 preguntas (quizData)
+│   ├── quiz.js                ← datos de las 30 preguntas de respaldo (quizData)
+│   ├── quiz_pool.json         ← pool grande de preguntas (opcional, generado)
 │   └── app.js                 ← lógica de la aplicación
 ├── backend/
 │   ├── db.sql                 ← extensión pgvector y tabla chunks
@@ -158,10 +225,14 @@ El trabajo se apoya en `specs/NNN-nombre/`, con `spec.md` (qué y por qué),
 │   ├── chunk.py               ← troceado semántico
 │   ├── embed.py               ← embeddings con Ollama
 │   ├── ingest.py              ← orquestador de la ingesta
-│   ├── generate_quiz.py       ← genera las 30 preguntas y escribe js/quiz.js
+│   ├── generate_quiz.py       ← genera las 30 preguntas y el pool
+│   ├── reparar_quiz.py        ← detecta y arregla preguntas solapadas
 │   ├── historial.py           ← historial de partidas (data/partidas.json)
+│   ├── test_pool.py           ← pruebas unitarias del generador del pool
 │   └── server.py              ← servidor web: interfaz + API del historial
-├── tests/quiz.spec.js         ← pruebas de Playwright
+├── tests/quiz.spec.js         ← pruebas de Playwright del quiz
+├── tests/pool.spec.js         ← pruebas de Playwright del pool
+├── tests/fixtures/pool.js     ← pool de prueba para las pruebas
 ├── playwright.config.js       ← configuración de Playwright
 ├── package.json               ← dependencias de Node (solo tests)
 ├── mcp.json                   ← servidores MCP del proyecto (sin claves)

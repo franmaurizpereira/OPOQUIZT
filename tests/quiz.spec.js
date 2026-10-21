@@ -39,7 +39,11 @@ async function indiceOpcionCorrecta(page) {
     return page.evaluate(() => {
         const bloque = document.querySelector('.quizlib-question:not(.oculto)');
         const enunciado = bloque.querySelector('.quizlib-question-title').textContent;
-        const pregunta = quizData.find((p) => p.pregunta === enunciado);
+        // La pregunta puede venir del pool o de quiz.js: se busca en el
+                // banco activo, que es el que usa la partida en curso
+                const pregunta = (window.bancoPreguntas || []).find(
+                    (p) => p.pregunta === enunciado
+                );
         if (!pregunta) return 0;
         const textoCorrecto = pregunta.opciones[pregunta.correcta].replace(/^[A-D]\)\s*/, '');
         const opciones = Array.from(bloque.querySelectorAll('.opcion-texto'));
@@ -343,7 +347,11 @@ test.describe('Historial de partidas', () => {
                 const bloque = document.querySelector('.quizlib-question:not(.oculto)');
                 const opciones = Array.from(bloque.querySelectorAll('.opcion-texto'));
                 const enunciado = bloque.querySelector('.quizlib-question-title').textContent;
-                const pregunta = quizData.find((p) => p.pregunta === enunciado);
+                // La pregunta puede venir del pool o de quiz.js: se busca en el
+                // banco activo, que es el que usa la partida en curso
+                const pregunta = (window.bancoPreguntas || []).find(
+                    (p) => p.pregunta === enunciado
+                );
                 if (!pregunta) return 0;
                 // El texto de la opción correcta, sin la letra que se muestra
                 const textoCorrecto = pregunta.opciones[pregunta.correcta].replace(/^[A-D]\)\s*/, '');
@@ -433,7 +441,11 @@ test.describe('Partidas sin repeticiones y con orden variable', () => {
                 const mapa = {};
                 document.querySelectorAll('.quizlib-question').forEach((bloque) => {
                     const enunciado = bloque.querySelector('.quizlib-question-title').textContent;
-                    const pregunta = quizData.find((p) => p.pregunta === enunciado);
+                    // La pregunta puede venir del pool o de quiz.js: se busca en el
+                // banco activo, que es el que usa la partida en curso
+                const pregunta = (window.bancoPreguntas || []).find(
+                    (p) => p.pregunta === enunciado
+                );
                     if (!pregunta) return;
                     const textoCorrecto = pregunta.opciones[pregunta.correcta]
                         .replace(/^[A-D]\)\s*/, '');

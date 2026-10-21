@@ -10,8 +10,26 @@
     // Valores posibles del input de cada opción
     const LETRAS = ['a', 'b', 'c', 'd'];
 
-    // Datos de las preguntas (definidos en js/quiz.js)
+    // Número de preguntas de cada partida
     const TOTAL = quizData.length;
+
+    // Fichero con el pool grande de preguntas (generado offline)
+    const FICHERO_POOL = 'js/quiz_pool.json';
+
+    // Banco de preguntas disponible: el pool si se ha podido cargar y,
+    // si no, las 30 preguntas fijas de js/quiz.js
+    let banco = quizData;
+
+    // El banco se expone para poder inspeccionarlo desde la consola del
+    // navegador y desde las pruebas automáticas
+    window.bancoPreguntas = banco;
+
+    // Promesa de carga del pool: se comparte para no descargarlo dos veces
+    // ni reconstruir el quiz a mitad de partida
+    let promesaPool = null;
+
+    // Indica si el jugador ya ha empezado una partida
+    let juegoIniciado = false;
 
     // Elementos de la interfaz
     const pantallaInicio = document.getElementById('pantalla-inicio');
@@ -44,11 +62,137 @@
     /* ---------------------------------------------------------- mezclar */
 
     /**
+     * Comprueba que una pregunta del pool tiene el formato esperado.
+     * Si el pool viniera incompleto, se descartan las preguntas raras.
+     */
+    function preguntaValida(pregunta) {
+        return Boolean(
+            pregunta &&
+            typeof pregunta.pregunta === 'string' &&
+            pregunta.pregunta.length > 0 &&
+            Array.isArray(pregunta.opciones) &&
+            pregunta.opciones.length === 4 &&
+            Number.isInteger(pregunta.correcta) &&
+            pregunta.correcta >= 0 &&
+            pregunta.correcta <= 3 &&
+            typeof pregunta.explicacion === 'string' &&
+            pregunta.explicacion.length > 0
+        );
+    }
+
+    /**
+     * Carga el pool de preguntas desde `js/quiz_pool.json`.
+     *
+     * Si el fichero no existe, está corrupto o trae menos preguntas de las
+     * necesarias, se avisa por consola y se sigue con las 30 preguntas fijas
+     * de `js/quiz.js`: el quiz nunca deja de funcionar.
+     *
+     * La carga se hace una sola vez: la promesa se guarda y se comparte.
+     */
+    function cargarPool() {
+        if (promesaPool) {
+            return promesaPool;
+        }
+
+        promesaPool = (async function () {
+            try {
+                const respuesta = await fetch(FICHERO_POOL, { cache: 'no-store' });
+                if (!respuesta.ok) {
+                    throw new Error('no se ha podido cargar el pool');
+                }
+
+                const datos = await respuesta.json();
+                if (!Array.isArray(datos)) {
+                    throw new Error('el pool no es una lista de preguntas');
+                }
+
+                const validas = datos.filter(preguntaValida);
+                if (validas.length < TOTAL) {
+                    throw new Error(
+                        'el pool solo tiene ' + validas.length + ' preguntas válidas'
+                    );
+                }
+
+                banco = validas;
+                window.bancoPreguntas = banco;
+                console.log('Pool cargado: ' + validas.length + ' preguntas');
+            } catch (error) {
+                banco = quizData;
+                window.bancoPreguntas = banco;
+                console.warn(
+                    'No se ha podido usar el pool de preguntas (' + error.message +
+                    '). Se usan las ' + TOTAL + ' preguntas de quiz.js.'
+                );
+            }
+            return banco;
+        })();
+
+        return promesaPool;
+    }
+
+    /**
+     * Elige las preguntas de la partida al azar del banco disponible.
+     *
+     * Se baraja el banco entero y se toman las primeras `TOTAL`, así que
+     * ninguna se repite dentro de la partida. El banco no se modifica.
+     *
+     * Además se evita que dos preguntas de la misma partida tengan alguna
+     * opción repetida: son las que delatan la respuesta al jugador. Si con
+     * esa restricción no se llegan a 30 preguntas, se completa con las que
+     * quedan, que siempre hay.
+     */
+    function elegirPartida() {
+        const barajado = banco.slice();
+        for (let i = barajado.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const temporal = barajado[i];
+            barajado[i] = barajado[j];
+            barajado[j] = temporal;
+        }
+
+        // Normaliza el texto de las opciones para comparar sin la letra
+        const sinLetra = function (opcion) {
+            return String(opcion).replace(/^[A-D]\)\s*/, '').trim().toLowerCase();
+        };
+
+        const elegidas = [];
+        const opcionesUsadas = {};
+        const sobrantes = [];
+
+        for (let i = 0; i < barajado.length; i++) {
+            const pregunta = barajado[i];
+            const textos = pregunta.opciones.map(sinLetra);
+            const repetida = textos.some(function (texto) {
+                return opcionesUsadas[texto];
+            });
+
+            if (elegidas.length < TOTAL && !repetida) {
+                elegidas.push(pregunta);
+                textos.forEach(function (texto) {
+                    opcionesUsadas[texto] = true;
+                });
+            } else {
+                sobrantes.push(pregunta);
+            }
+        }
+
+        // Si no se han juntado 30 preguntas sin opciones repetidas, se
+        // completa con las que quedan: es preferible un par de opciones
+        // repetidas a quedarse sin partida.
+        for (let i = 0; i < sobrantes.length && elegidas.length < TOTAL; i++) {
+            elegidas.push(sobrantes[i]);
+        }
+
+        return elegidas.slice(0, TOTAL);
+    }
+
+    /**
      * Mezcla el orden de las preguntas y el de las opciones de cada una.
      *
-     * Se trabaja sobre una copia: `quizData` (js/quiz.js) no se modifica,
-     * así que cada partida tiene su propio orden y la respuesta correcta no
-     * ocupa siempre la misma posición.
+     * Se trabaja sobre una copia: ni el pool (`js/quiz_pool.json`) ni
+     * `quizData` (`js/quiz.js`) se modifican, así que cada partida tiene su
+     * propio orden y la respuesta correcta no ocupa siempre la misma
+     * posición.
      */
     function mezclarPartida(preguntas) {
         const mezcladas = preguntas.map(function (pregunta) {
@@ -103,7 +247,7 @@
     function construirPreguntas() {
         contenedor.innerHTML = '';
 
-        partida = mezclarPartida(quizData);
+        partida = mezclarPartida(elegirPartida());
 
         partida.forEach(function (pregunta, i) {
             const bloque = document.createElement('div');
@@ -396,7 +540,12 @@
         construirPreguntas();
     }
 
-    botonEmpezar.addEventListener('click', function () {
+    botonEmpezar.addEventListener('click', async function () {
+        // Antes de empezar se espera a que el pool esté cargado: si la carga
+        // falla, se sigue con las preguntas fijas de quiz.js
+        juegoIniciado = true;
+        await cargarPool();
+
         // Se reinicia siempre: así una partida nueva nunca hereda el estado
         // de la anterior (por ejemplo, si se vuelve desde la pantalla final)
         reiniciarPartida();
@@ -464,7 +613,20 @@
 
     // Estado inicial
     preguntaTotal.textContent = String(TOTAL);
+
+    // Se pinta la partida con las preguntas fijas para que la pantalla tenga
+    // contenido desde el primer momento
     construirPreguntas();
     mostrarPregunta(0);
+
+    // El pool se carga en segundo plano: si el jugador aún no ha empezado,
+    // se repinta la partida con las preguntas del pool
+    cargarPool().then(function () {
+        if (!juegoIniciado) {
+            construirPreguntas();
+            mostrarPregunta(0);
+        }
+    });
+
     cargarHistorial();
 })();
