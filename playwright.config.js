@@ -21,6 +21,12 @@ module.exports = defineConfig({
     testDir: './tests',
     timeout: 60000,
     reporter: [['list']],
+    // Las pruebas comparten un único servidor y un único fichero de historial
+    // (data/partidas-test.json): varias de ellas lo vacían y otras juegan
+    // partidas que se registran solas. En paralelo se pisan entre sí y
+    // aparecen fallos intermitentes, así que se ejecutan de una en una.
+    // Se pierden unos segundos, se gana un resultado fiable.
+    workers: 1,
     use: {
         baseURL: `http://127.0.0.1:${PUERTO_PRUEBAS}`,
         headless: true,

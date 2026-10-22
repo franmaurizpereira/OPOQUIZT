@@ -121,6 +121,12 @@ navegador sin altavoces: comprueban los contadores que expone
 ninguno con el sonido apagado) y que, sin Web Audio, la partida sigue
 funcionando. En total son **45 pruebas** de Playwright.
 
+Las pruebas se ejecutan **de una en una** (`workers: 1` en
+`playwright.config.js`): comparten un único servidor y un único fichero de
+historial (`data/partidas-test.json`), y varias juegan partidas que se
+registran solas. En paralelo se pisaban entre sí y salían fallos
+intermitentes; en serie tardan algo más, pero el resultado es fiable.
+
 Las pruebas unitarias del generador del pool (sin necesidad de Ollama ni de
 la base de datos) se ejecutan con:
 
