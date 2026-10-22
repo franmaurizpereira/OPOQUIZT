@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import config
 import generate_quiz as g
+import historial
 
 
 def fragmentos_de_prueba(num_pdf=9, por_pdf=300, longitud=400, prefijo="doc"):
@@ -582,6 +583,127 @@ class TestCacheDelPool(unittest.TestCase):
         """Si la caché está corrupta, no se rompe: se devuelve vacío."""
         self.ruta.write_text("{esto no es json", encoding="utf-8")
         self.assertEqual(g.cargar_cache(self.ruta), [])
+
+
+class TestDetalleDelHistorial(unittest.TestCase):
+    """El detalle de la partida (la revisión) se guarda y se valida."""
+
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.ruta = Path(self.dir.name) / "partidas.json"
+        self.anterior = historial.RUTA_HISTORIAL
+        historial.RUTA_HISTORIAL = self.ruta
+
+    def tearDown(self):
+        historial.RUTA_HISTORIAL = self.anterior
+        self.dir.cleanup()
+
+    def _detalle(self, **cambios):
+        pregunta = {
+            "pregunta": "¿Qué dice el artículo 1?",
+            "opciones": ["A) Una", "B) Dos", "C) Tres", "D) Cuatro"],
+            "correcta": 1,
+            "elegida": 2,
+            "acertada": False,
+            "contestada": True,
+            "explicacion": "Porque el artículo 1 dice una cosa y no otra.",
+        }
+        pregunta.update(cambios)
+        return [pregunta]
+
+    def test_valida_un_detalle_correcto(self):
+        detalle = historial.validar_detalle(self._detalle())
+        self.assertIsNotNone(detalle)
+        self.assertEqual(len(detalle), 1)
+        self.assertEqual(detalle[0]["correcta"], 1)
+        self.assertEqual(detalle[0]["elegida"], 2)
+        self.assertFalse(detalle[0]["acertada"])
+
+    def test_rechaza_un_detalle_mal_formado(self):
+        self.assertIsNone(historial.validar_detalle("no soy una lista"))
+        self.assertIsNone(historial.validar_detalle([{"pregunta": ""}]))
+        self.assertIsNone(historial.validar_detalle(self._detalle(correcta=9)))
+        self.assertIsNone(
+            historial.validar_detalle(self._detalle(opciones=["A", "B"]))
+        )
+
+    def test_acepta_una_lista_vacia(self):
+        self.assertEqual(historial.validar_detalle([]), [])
+
+    def test_guarda_y_recupera_el_detalle(self):
+        historial.guardar_partida(20, 10, self._detalle())
+        partidas = historial.leer_partidas()
+        self.assertEqual(len(partidas), 1)
+        self.assertEqual(len(partidas[0]["detalle"]), 1)
+        self.assertEqual(partidas[0]["detalle"][0]["correcta"], 1)
+
+    def test_guarda_sin_detalle(self):
+        historial.guardar_partida(20, 10)
+        partidas = historial.leer_partidas()
+        self.assertEqual(len(partidas), 1)
+        self.assertNotIn("detalle", partidas[0])
+
+    def test_poda_el_detalle_de_las_partidas_antiguas(self):
+        for _ in range(historial.MAXIMO_CON_DETALLE + 3):
+            historial.guardar_partida(20, 10, self._detalle())
+
+        partidas = historial.leer_partidas()
+        self.assertEqual(len(partidas), historial.MAXIMO_CON_DETALLE + 3)
+
+        # Las más recientes conservan el detalle
+        con_detalle = [p for p in partidas if "detalle" in p]
+        self.assertEqual(len(con_detalle), historial.MAXIMO_CON_DETALLE)
+
+        # Las antiguas lo pierden, pero siguen ahí con su puntuación
+        sin_detalle = [p for p in partidas if "detalle" not in p]
+        self.assertEqual(len(sin_detalle), 3)
+        for partida in sin_detalle:
+            self.assertIn("aciertos", partida)
+            self.assertIn("fecha", partida)
+
+
+class TestValidarExplicaciones(unittest.TestCase):
+    """La validación de las explicaciones reescritas (spec 004, RF6)."""
+
+    def test_detecta_las_explicaciones_que_no_se_entienden_solas(self):
+        self.assertTrue(
+            g._explicacion_necesita_reescritura(
+                {"explicacion": "El pasaje cita la Ley 39/2015."}
+            )
+        )
+        self.assertTrue(
+            g._explicacion_necesita_reescritura(
+                {"explicacion": "Según el texto, la opción es correcta."}
+            )
+        )
+        self.assertFalse(
+            g._explicacion_necesita_reescritura(
+                {"explicacion": "La Ley 39/2015 regula el procedimiento."}
+            )
+        )
+
+    def test_una_explicacion_valida_pasa_la_validacion(self):
+        buena = (
+            "La Ley 39/2015, de 1 de octubre, del Procedimiento Administrativo "
+            "Común, regula en su título primero los derechos de los "
+            "interesados en el procedimiento administrativo."
+        )
+        self.assertTrue(g._explicacion_valida(buena, "¿Qué regula la Ley 39/2015?"))
+
+    def test_se_rechazan_las_explicaciones_cortas_o_largas(self):
+        self.assertFalse(g._explicacion_valida("Corta.", "Enunciado"))
+        self.assertFalse(g._explicacion_valida("x" * 700, "Enunciado"))
+
+    def test_se_rechazan_las_explicaciones_que_hablan_del_texto(self):
+        mala = (
+            "El texto de la Ley 39/2015 establece que los interesados tienen "
+            "derecho a la información que obra en poder del órgano."
+        )
+        self.assertFalse(g._explicacion_valida(mala, "Enunciado"))
+
+    def test_se_rechaza_una_explicacion_que_repite_el_enunciado(self):
+        enunciado = "Esta es la pregunta tal cual está escrita aquí."
+        self.assertFalse(g._explicacion_valida(enunciado, enunciado))
 
 
 if __name__ == "__main__":

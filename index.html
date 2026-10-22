@@ -65,11 +65,39 @@
             <div id="resultado-puntuacion" class="puntuacion">0 / 30</div>
             <p id="resultado-texto" class="pantalla-texto"></p>
             <div class="botones-final">
+                <button id="boton-revisar" class="boton boton-grande boton-secundario oculto" type="button">REVISAR PARTIDA</button>
                 <button id="boton-reiniciar" class="boton boton-grande" type="button">VOLVER A EMPEZAR</button>
                 <button id="boton-inicio" class="boton boton-grande boton-secundario" type="button">INICIO</button>
             </div>
         </section>
     </main>
+
+    <!-- Ventana modal con la revisión de la partida -->
+    <div id="revision-overlay" class="revision-overlay oculto" role="dialog" aria-modal="true" aria-labelledby="revision-titulo">
+        <div id="revision-panel" class="revision-panel" tabindex="-1">
+            <header class="revision-cabecera">
+                <div>
+                    <h2 id="revision-titulo" class="revision-titulo">&gt; REVISIÓN DE LA PARTIDA</h2>
+                    <p id="revision-resumen" class="revision-resumen"></p>
+                </div>
+                <button id="revision-cerrar" class="revision-cerrar" type="button" aria-label="Cerrar la revisión">X</button>
+            </header>
+
+            <div class="revision-filtros" role="group" aria-label="Filtrar la revisión">
+                <button class="revision-filtro activo" data-filtro="todas" type="button">TODAS</button>
+                <button class="revision-filtro" data-filtro="acertadas" type="button">ACIERTAS</button>
+                <button class="revision-filtro" data-filtro="falladas" type="button">FALLADAS</button>
+                <button class="revision-filtro" data-filtro="sin-contestar" type="button">SIN CONTESTAR</button>
+            </div>
+
+            <div id="revision-lista" class="revision-lista"></div>
+            <p id="revision-vacio" class="revision-vacio oculto">NO HAY PREGUNTAS CON ESE FILTRO.</p>
+
+            <footer class="revision-pie">
+                <button id="revision-cerrar-pie" class="boton boton-secundario" type="button">CERRAR</button>
+            </footer>
+        </div>
+    </div>
 
     <footer class="pie">
         <p>OPOQUIZ · GENERADO CON POSTGRESQL + PGVECTOR · OLLAMA</p>

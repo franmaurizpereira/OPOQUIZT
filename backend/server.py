@@ -96,7 +96,9 @@ class Manejador(BaseHTTPRequestHandler):
             return
 
         with LOCK_ESCRITURA:
-            partidas = historial.guardar_partida(aciertos, fallos)
+            partidas = historial.guardar_partida(
+                aciertos, fallos, datos.get("detalle")
+            )
 
         if partidas is None:
             self._enviar_json(400, {"error": "no se ha podido guardar la partida"})

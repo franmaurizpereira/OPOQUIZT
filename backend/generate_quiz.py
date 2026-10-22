@@ -1056,14 +1056,215 @@ def parse_args(argv=None):
             "(pool para partidas aleatorias). No modifica js/quiz.js."
         ),
     )
+    analizador.add_argument(
+        "--mejorar-explicaciones",
+        action="store_true",
+        help=(
+            "Reescribe las explicaciones de js/quiz_pool.json que hablan de "
+            "'el texto' o 'el pasaje' para que se entiendan solas. "
+            "Necesita OPENROUTER_API_KEY."
+        ),
+    )
     return analizador.parse_args(argv)
 
 
 def main(argv=None):
     argumentos = parse_args(argv)
+    if argumentos.mejorar_explicaciones:
+        return main_mejorar_explicaciones()
     if argumentos.pool is not None:
         return main_pool(argumentos.pool)
     return main_normal()
+
+
+def main_mejorar_explicaciones():
+    """Modo `--mejorar-explicaciones`: reescribe las explicaciones del pool.
+
+    Algunas explicaciones dicen "el texto" o "el pasaje" para referirse al
+    fragmento del que salieron. En la revisión de la partida esas palabras no
+    significan nada para quien la lee, así que se reescriben para que la
+    explicación se entienda sola.
+
+    Solo se toca el campo `explicacion`: el enunciado, las opciones y la
+    posición de la correcta no se modifican.
+    """
+    if not config.OPENROUTER_API_KEY:
+        print(
+            "Falta OPENROUTER_API_KEY: hace falta un modelo remoto para "
+            "reescribir las explicaciones."
+        )
+        return
+
+    inicio = time.time()
+    preguntas = json.loads(config.QUIZ_POOL_PATH.read_text(encoding="utf-8"))
+    print(f"Preguntas en el pool: {len(preguntas)}")
+
+    pendientes = [p for p in preguntas if _explicacion_necesita_reescritura(p)]
+    print(f"Explicaciones que hablan de 'el texto': {len(pendientes)}")
+
+    if not pendientes:
+        print("No hay nada que reescribir.")
+        return
+
+    # Se guarda el progreso aparte para poder parar y reanudar
+    ruta_cache = config.RUTA_CACHE_POOL.parent / "explicaciones_cache.json"
+    ya_hechas = _cargar_lista(ruta_cache)
+    indices_hechos = {p.get("indice") for p in ya_hechas}
+
+    reescritas = 0
+    for indice, pregunta in enumerate(pendientes):
+        if indice in indices_hechos:
+            continue
+
+        nueva = mejorar_explicacion(
+            config.MODELO_LLM_OPENROUTER,
+            pregunta["pregunta"],
+            pregunta["opciones"],
+            pregunta.get("correcta", 0),
+            pregunta["explicacion"],
+        )
+
+        if nueva:
+            reescritas += 1
+            ya_hechas.append({"indice": indice, "explicacion": nueva})
+
+        if (indice + 1) % 10 == 0:
+            _guardar_lista(ya_hechas, ruta_cache)
+            print(
+                f"  [checkpoint] {indice + 1}/{len(pendientes)} "
+                f"explicaciones revisadas",
+                flush=True,
+            )
+
+    _guardar_lista(ya_hechas, ruta_cache)
+
+    # Se aplican las mejoras al pool
+    for mejora in ya_hechas:
+        indice = mejora.get("indice")
+        if isinstance(indice, int) and 0 <= indice < len(pendientes):
+            pendientes[indice]["explicacion"] = mejora["explicacion"]
+
+    escribir_pool_json(preguntas)
+    print(f"Explicaciones reescritas: {reescritas}")
+    print(f"Tiempo total: {time.time() - inicio:.1f} s")
+
+
+# Expresiones que hacen que una explicación no se entienda sola.
+# "el Texto Refundido" es el nombre de una ley y no cuenta.
+PATRON_REFERENCIAS = re.compile(
+    r"\b(el texto|el pasaje|el contexto|el fragmento)\b"
+    r"(?!\s+(refundido|consolidado))",
+    re.IGNORECASE,
+)
+
+
+def _cargar_lista(ruta):
+    """Carga una lista de JSON de un fichero. Si no existe o está corrupto, vacío."""
+    if not ruta.exists():
+        return []
+    try:
+        datos = json.loads(ruta.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+    return datos if isinstance(datos, list) else []
+
+
+def _guardar_lista(elementos, ruta):
+    """Guarda una lista de JSON en un fichero, de forma atómica."""
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    temporal = ruta.with_suffix(".tmp")
+    temporal.write_text(
+        json.dumps(elementos, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    temporal.replace(ruta)
+
+
+def _explicacion_necesita_reescritura(pregunta):
+    """Indica si la explicación habla de "el texto" o "el pasaje"."""
+    explicacion = str(pregunta.get("explicacion", ""))
+    return bool(PATRON_REFERENCIAS.search(explicacion))
+
+
+def _explicacion_valida(explicacion, enunciado):
+    """Comprueba que la explicación reescrita es utilizable.
+
+    Debe estar en español, tener una longitud razonable, no hablar de "el
+    texto" y no ser una copia del enunciado.
+    """
+    if not isinstance(explicacion, str):
+        return False
+
+    texto = explicacion.strip()
+    if len(texto) < 40 or len(texto) > 600:
+        return False
+
+    if _explicacion_necesita_reescritura({"explicacion": texto}):
+        return False
+
+    # No debe repetir el enunciado
+    if texto.lower() == str(enunciado).strip().lower():
+        return False
+
+    return True
+
+
+def mejorar_explicacion(modelo, enunciado, opciones, correcta, explicacion_actual):
+    """Reescribe una explicación para que se entienda sola.
+
+    Devuelve la nueva explicación o None si no se ha podido mejorarla (en ese
+    caso se conserva la anterior).
+    """
+    correcta_texto = ""
+    if isinstance(opciones, list) and 0 <= correcta < len(opciones):
+        correcta_texto = str(opciones[correcta])
+
+    prompt = f"""Eres un profesor de oposiciones de la Administración Pública.
+
+Esta es la pregunta:
+{enunciado}
+
+Y estas son sus cuatro opciones, siendo la correcta:
+{correcta_texto}
+
+Esta es la explicación que hay que reescribir:
+{explicacion_actual}
+
+Reescribe la explicación con estas reglas:
+- Explica por qué la opción "{correcta_texto}" es la correcta.
+- NO escribas "el texto", "el pasaje", "el contexto", "el fragmento" ni
+  "según el texto": la explicación tiene que entenderse sola, sin ver el
+  documento original.
+- Menciona el dato concreto (la ley, el artículo o el concepto) que sustenta
+  la respuesta.
+- Entre 40 y 600 caracteres, en español claro y sin errores.
+- No inventes datos que no estén en la explicación original.
+
+Responde SOLO con la explicación reescrita, sin comillas ni texto adicional."""
+
+    try:
+        respuesta = _llamar_llm(prompt, modelo=modelo, formato="json")
+    except Exception as exc:  # noqa: BLE001 - se informa y se sigue
+        print(f"    error del LLM: {exc}", flush=True)
+        return None
+
+    explicacion = str(respuesta).strip()
+    # Si el modelo devuelve un JSON con la explicación dentro, se extrae
+    if explicacion.startswith("{"):
+        try:
+            datos = json.loads(explicacion)
+            if isinstance(datos, dict):
+                for clave in ("explicacion", "explanation", "texto", "answer"):
+                    if clave in datos:
+                        explicacion = str(datos[clave]).strip()
+                        break
+        except json.JSONDecodeError:
+            pass
+
+    if not _explicacion_valida(explicacion, enunciado):
+        print("    explicación descartada: no supera la validación", flush=True)
+        return None
+
+    return explicacion
 
 
 def main_normal():

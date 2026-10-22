@@ -140,6 +140,21 @@ sale de 30 preguntas elegidas al azar entre todas las del pool: es un examen
 distinto en cada partida. Si el pool no está o no se puede cargar, el quiz
 sigue funcionando con las 30 preguntas fijas de `js/quiz.js`.
 
+## Revisar la partida
+
+Al terminar una partida, el botón **REVISAR PARTIDA** abre una ventana modal
+con las 30 preguntas de esa partida:
+
+- La opción correcta en verde y la que elegiste, si era incorrecta, en rojo.
+- La explicación de cada respuesta, para repasar los fallos.
+- Un resumen con los aciertos, los fallos y las preguntas sin contestar.
+- Filtros para ver solo las acertadas, las falladas o las sin contestar.
+
+Las partidas jugadas quedan guardadas con su detalle en el historial, así que
+también se pueden repasar desde la pantalla de inicio (botón **REVISAR**).
+Del historial solo se conserva el detalle de las 20 partidas más recientes;
+de las anteriores se guarda la fecha y la puntuación.
+
 ### Generar el pool de preguntas
 
 El pool se genera **una sola vez, offline**, con un modelo de lenguaje:
@@ -186,6 +201,27 @@ El pool se genera **una sola vez, offline**, con un modelo de lenguaje:
   duplicados y que la respuesta correcta esté repartida entre las cuatro
   opciones.
 
+### Mejorar las explicaciones del pool
+
+Algunas explicaciones del pool dicen "el texto" o "el pasaje" para referirse
+al documento del que salieron. En la revisión de la partida esas palabras no
+significan nada, así que se pueden reescribir para que se entiendan solas:
+
+```bash
+export OPENROUTER_API_KEY="sk-or-v1-..."
+.venv/bin/python backend/generate_quiz.py --mejorar-explicaciones
+```
+
+- Solo reescribe las explicaciones que lo necesitan (las que hablan de "el
+  texto"): el enunciado, las opciones y la posición de la correcta no se
+  tocan.
+- Si la explicación reescrita no supera la validación (por ejemplo, si sigue
+  hablando de "el texto"), se conserva la anterior: el pool nunca empeora.
+- Se puede parar y reanudar: el progreso queda en
+  `logs/explicaciones_cache.json`.
+- El modelo es el mismo que el del pool (`minimax/minimax-m3.1-flash:free`),
+  pero se puede cambiar con la variable `OPENROUTER_MODEL`.
+
 El banco de preguntas se revisa con:
 ```bash
 .venv/bin/python backend/reparar_quiz.py            # informa de solapamientos
@@ -228,10 +264,11 @@ El trabajo se apoya en `specs/NNN-nombre/`, con `spec.md` (qué y por qué),
 │   ├── generate_quiz.py       ← genera las 30 preguntas y el pool
 │   ├── reparar_quiz.py        ← detecta y arregla preguntas solapadas
 │   ├── historial.py           ← historial de partidas (data/partidas.json)
-│   ├── test_pool.py           ← pruebas unitarias del generador del pool
+│   ├── test_pool.py           ← pruebas unitarias del generador y del historial
 │   └── server.py              ← servidor web: interfaz + API del historial
 ├── tests/quiz.spec.js         ← pruebas de Playwright del quiz
 ├── tests/pool.spec.js         ← pruebas de Playwright del pool
+├── tests/revision.spec.js     ← pruebas de Playwright de la revisión
 ├── tests/fixtures/pool.js     ← pool de prueba para las pruebas
 ├── playwright.config.js       ← configuración de Playwright
 ├── package.json               ← dependencias de Node (solo tests)

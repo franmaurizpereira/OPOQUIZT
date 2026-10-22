@@ -12,6 +12,12 @@ Formato del fichero:
 
 La fecha se guarda como marca de tiempo local en ISO (sin zona horaria): así
 se ordena por el instante real aunque dos partidas caigan el mismo día.
+
+A partir de la spec 004 cada partida puede llevar además su `detalle`: la
+revisión completa (enunciado, opciones, opción elegida, correcta, resultado y
+explicación de cada pregunta). El detalle solo se conserva de las partidas
+más recientes (ver `MAXIMO_CON_DETALLE`): así el fichero no crece sin límite
+y las partidas antiguas siguen mostrando su fecha y su puntuación.
 """
 
 import json
@@ -31,6 +37,10 @@ RUTA_HISTORIAL = Path(
 
 # Número máximo de partidas que se conservan en el fichero
 MAX_PARTIDAS = 100
+
+# Número de partidas más recientes que conservan el detalle de la revisión.
+# De las anteriores se poda el detalle, pero no se pierde la partida.
+MAXIMO_CON_DETALLE = 20
 
 # Total de preguntas de una partida completa
 TOTAL_PREGUNTAS = 30
@@ -83,6 +93,65 @@ def _partida_valida(partida) -> bool:
     return 0 <= aciertos <= TOTAL_PREGUNTAS and 0 <= fallos <= TOTAL_PREGUNTAS
 
 
+def validar_detalle(detalle):
+    """Valida el detalle de una partida (la revisión).
+
+    Devuelve el detalle limpio (una lista de preguntas) o None si no es
+    válido. Se aceptan también listas vacías: una partida puede haberse
+    registrado sin detalle (por ejemplo, si se cortó la partida).
+    """
+    if detalle is None:
+        return None
+    if not isinstance(detalle, list):
+        return None
+    if len(detalle) == 0:
+        return []
+    if len(detalle) > TOTAL_PREGUNTAS:
+        return None
+
+    limpio = []
+    for pregunta in detalle:
+        if not isinstance(pregunta, dict):
+            return None
+
+        enunciado = pregunta.get("pregunta")
+        opciones = pregunta.get("opciones")
+        correcta = pregunta.get("correcta")
+        elegida = pregunta.get("elegida", -1)
+        acertada = pregunta.get("acertada", False)
+        contestada = pregunta.get("contestada", True)
+        explicacion = pregunta.get("explicacion", "")
+
+        if not isinstance(enunciado, str) or not enunciado.strip():
+            return None
+        if not isinstance(opciones, list) or len(opciones) != 4:
+            return None
+        if any(not isinstance(opcion, str) or not opcion.strip() for opcion in opciones):
+            return None
+        if not isinstance(correcta, int) or not 0 <= correcta <= 3:
+            return None
+        if not isinstance(elegida, int) or not -1 <= elegida <= 3:
+            return None
+        if not isinstance(acertada, bool) or not isinstance(contestada, bool):
+            return None
+        if not isinstance(explicacion, str):
+            return None
+
+        limpio.append(
+            {
+                "pregunta": enunciado,
+                "opciones": list(opciones),
+                "correcta": correcta,
+                "elegida": elegida,
+                "acertada": acertada,
+                "contestada": contestada,
+                "explicacion": explicacion,
+            }
+        )
+
+    return limpio
+
+
 def validar_puntuacion(aciertos, fallos):
     """Valida una puntuación antes de registrarla.
 
@@ -122,11 +191,15 @@ def _escribir(partidas):
         raise
 
 
-def guardar_partida(aciertos, fallos):
+def guardar_partida(aciertos, fallos, detalle=None):
     """Registra una partida terminada y devuelve el historial completo.
 
     La partida nueva se coloca al principio (la más reciente). Si la
     puntuación no es válida no se escribe nada y se devuelve None.
+
+    El `detalle` (la revisión de la partida) es opcional: si no es válido se
+    guarda la partida sin él. Solo las partidas más recientes conservan el
+    detalle; de las anteriores se poda para que el fichero no crezca.
     """
     aciertos, fallos = validar_puntuacion(aciertos, fallos)
     if aciertos is None:
@@ -138,7 +211,17 @@ def guardar_partida(aciertos, fallos):
         "fallos": fallos,
     }
 
+    detalle_limpio = validar_detalle(detalle)
+    if detalle_limpio:
+        partida["detalle"] = detalle_limpio
+
     partidas = [partida] + leer_partidas()
     partidas = partidas[:MAX_PARTIDAS]
+
+    # Solo las partidas más recientes conservan el detalle de la revisión
+    for indice, anterior in enumerate(partidas):
+        if indice >= MAXIMO_CON_DETALLE:
+            anterior.pop("detalle", None)
+
     _escribir(partidas)
     return partidas

@@ -622,6 +622,20 @@ body::after {
     border-bottom: 0;
 }
 
+.boton-revisar {
+    padding: 4px 10px;
+    font-size: 0.68rem;
+    letter-spacing: 1px;
+    color: var(--neon-cian);
+    border-color: var(--neon-cian);
+}
+
+.boton-revisar:hover,
+.boton-revisar:focus-visible {
+    color: var(--fondo);
+    background: var(--neon-cian);
+}
+
 .partida-fecha {
     color: var(--neon-amarillo);
     letter-spacing: 1px;
@@ -667,6 +681,259 @@ body::after {
 
 .pie p {
     margin: 0;
+}
+
+/* ------------------------------------------------- ventana de revisión */
+
+.revision-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(10px, 2vw, 26px);
+    background: rgba(3, 4, 10, 0.86);
+}
+
+.revision-panel {
+    width: min(920px, 100%);
+    max-height: 92vh;
+    max-height: 92dvh;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: clamp(12px, 2vw, 20px);
+    background: var(--fondo-panel);
+    border: 2px solid var(--neon-cian);
+    box-shadow: 6px 6px 0 rgba(255, 43, 214, 0.55);
+    outline: none;
+}
+
+.revision-cabecera {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 10px;
+    border-bottom: 2px dashed rgba(0, 229, 255, 0.35);
+}
+
+.revision-titulo {
+    margin: 0;
+    color: var(--neon-amarillo);
+    font-size: clamp(0.95rem, 2.6vw, 1.25rem);
+    letter-spacing: 2px;
+    text-shadow: 0 0 12px rgba(255, 230, 0, 0.4);
+}
+
+.revision-resumen {
+    margin: 8px 0 0;
+    color: var(--texto);
+    font-size: 0.82rem;
+    letter-spacing: 1px;
+}
+
+.revision-resumen .aciertos {
+    color: var(--verde);
+}
+
+.revision-resumen .fallos {
+    color: var(--rojo);
+}
+
+.revision-resumen .sin-contestar {
+    color: var(--gris);
+}
+
+.revision-cerrar {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 auto;
+    font: inherit;
+    font-size: 1rem;
+    color: var(--neon-magenta);
+    background: transparent;
+    border: 2px solid var(--neon-magenta);
+    cursor: pointer;
+}
+
+.revision-cerrar:hover,
+.revision-cerrar:focus-visible {
+    color: var(--fondo);
+    background: var(--neon-magenta);
+}
+
+.revision-filtros {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.revision-filtro {
+    padding: 8px 12px;
+    font: inherit;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    color: var(--neon-cian);
+    background: transparent;
+    border: 2px solid var(--borde);
+    cursor: pointer;
+}
+
+.revision-filtro:hover,
+.revision-filtro:focus-visible {
+    border-color: var(--neon-cian);
+}
+
+.revision-filtro.activo {
+    color: var(--fondo);
+    background: var(--neon-cian);
+    border-color: var(--neon-cian);
+}
+
+.revision-lista {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-right: 6px;
+}
+
+.revision-pregunta {
+    border: 2px solid var(--borde);
+    border-left-width: 6px;
+    background: rgba(5, 6, 15, 0.7);
+    padding: 10px 12px;
+}
+
+.revision-pregunta[data-resultado="acierto"] {
+    border-left-color: var(--verde);
+}
+
+.revision-pregunta[data-resultado="fallo"] {
+    border-left-color: var(--rojo);
+}
+
+.revision-pregunta[data-resultado="sin-contestar"] {
+    border-left-color: var(--gris);
+}
+
+.revision-cabecera-pregunta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.revision-numero {
+    color: var(--neon-cian);
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+}
+
+.revision-resultado {
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+    padding: 2px 8px;
+    border: 2px solid currentColor;
+}
+
+.revision-pregunta[data-resultado="acierto"] .revision-resultado {
+    color: var(--verde);
+}
+
+.revision-pregunta[data-resultado="fallo"] .revision-resultado {
+    color: var(--rojo);
+}
+
+.revision-pregunta[data-resultado="sin-contestar"] .revision-resultado {
+    color: var(--gris);
+}
+
+.revision-enunciado {
+    margin: 0 0 10px;
+    color: var(--neon-amarillo);
+    font-size: 0.9rem;
+    line-height: 1.45;
+    font-weight: normal;
+}
+
+.revision-opciones {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.revision-opcion {
+    padding: 7px 10px;
+    border: 2px solid var(--borde);
+    border-left-width: 6px;
+    color: var(--texto);
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+.revision-opcion.correcta {
+    border-color: var(--verde);
+    border-left-color: var(--verde);
+    background: rgba(37, 255, 122, 0.1);
+    color: var(--verde);
+}
+
+.revision-opcion.elegida {
+    border-color: var(--rojo);
+    border-left-color: var(--rojo);
+    background: rgba(255, 43, 78, 0.12);
+    color: var(--rojo);
+}
+
+.revision-marca {
+    font-size: 0.7rem;
+    letter-spacing: 1px;
+    margin-left: 8px;
+    opacity: 0.9;
+}
+
+.revision-explicacion {
+    margin: 10px 0 0;
+    padding: 8px 10px;
+    border: 2px dashed rgba(57, 255, 20, 0.35);
+    color: var(--texto);
+    font-size: 0.8rem;
+    line-height: 1.5;
+}
+
+.revision-explicacion .explicacion-titulo {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--neon-lima);
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+}
+
+.revision-vacio {
+    margin: 0;
+    padding: 14px;
+    text-align: center;
+    color: var(--gris);
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+    border: 2px dashed var(--borde);
+}
+
+.revision-pie {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 10px;
+    border-top: 2px dashed rgba(0, 229, 255, 0.35);
 }
 
 /* ----------------------------------------------- movimiento reducido */

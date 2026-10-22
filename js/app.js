@@ -50,6 +50,17 @@
     const historialVacio = document.getElementById('historial-vacio');
     const bloqueHistorial = document.querySelector('.historial');
 
+    // Elementos de la ventana de revisión
+    const revisionOverlay = document.getElementById('revision-overlay');
+    const revisionPanel = document.getElementById('revision-panel');
+    const revisionLista = document.getElementById('revision-lista');
+    const revisionResumen = document.getElementById('revision-resumen');
+    const revisionVacio = document.getElementById('revision-vacio');
+    const revisionFiltros = Array.prototype.slice.call(
+        document.querySelectorAll('.revision-filtro')
+    );
+    const botonRevisar = document.getElementById('boton-revisar');
+
     // Estado de la partida
     let indice = 0;
     let aciertos = 0;
@@ -58,6 +69,74 @@
 
     // Preguntas de la partida en curso (copia mezclada de quizData)
     let partida = [];
+
+    /* ---------------------------------------------------------- detalle */
+
+    // Opción que eligió el jugador en cada pregunta (-1 si no se contestó)
+    let elegidas = [];
+
+    // Detalle de la última partida terminada (para poder revisarla)
+    let detallePartida = [];
+
+    // Detalle que se está mostrando en la ventana de revisión
+    let detalleRevision = [];
+
+    // Filtro activo de la ventana de revisión
+    let filtroRevision = 'todas';
+
+    // Botón que abrió la ventana de revisión (para devolverle el foco)
+    let botonOrigenRevision = null;
+
+    /**
+     * Construye el detalle de la partida en curso: una entrada por
+     * pregunta con el enunciado, las opciones, la opción elegida, la
+     * correcta, si se acertó y la explicación.
+     *
+     * No modifica el DOM ni los datos de la partida.
+     */
+    function recogerDetalle() {
+        return partida.map(function (pregunta, i) {
+            const contestada = Boolean(respondida[i]);
+            const elegida = contestada && typeof elegidas[i] === 'number'
+                ? elegidas[i]
+                : -1;
+
+            return {
+                pregunta: pregunta.pregunta,
+                opciones: pregunta.opciones.slice(),
+                correcta: pregunta.correcta,
+                elegida: elegida,
+                acertada: contestada && elegida === pregunta.correcta,
+                contestada: contestada,
+                explicacion: pregunta.explicacion
+            };
+        });
+    }
+
+    /**
+     * Resume un detalle de partida: cuántas se acertaron, cuántas se
+     * fallaron y cuántas quedaron sin contestar.
+     */
+    function resumirDetalle(detalle) {
+        const resumen = {
+            acertadas: 0,
+            falladas: 0,
+            sinContestar: 0,
+            total: detalle.length
+        };
+
+        detalle.forEach(function (pregunta) {
+            if (!pregunta.contestada) {
+                resumen.sinContestar += 1;
+            } else if (pregunta.acertada) {
+                resumen.acertadas += 1;
+            } else {
+                resumen.falladas += 1;
+            }
+        });
+
+        return resumen;
+    }
 
     /* ---------------------------------------------------------- mezclar */
 
@@ -418,8 +497,15 @@
         const porcentaje = Math.round((aciertos / TOTAL) * 100);
         resultadoPuntuacion.textContent = aciertos + ' / ' + TOTAL + '  (' + porcentaje + '%)';
 
+        // Se recoge el detalle de la partida (qué se eligió en cada
+        // pregunta) para poder revisarla después
+        detallePartida = recogerDetalle();
+
         // La partida terminada queda registrada en el historial del equipo
-        registrarPartida(aciertos, TOTAL - aciertos);
+        registrarPartida(aciertos, TOTAL - aciertos, detallePartida);
+
+        // El botón de revisión solo aparece si hay partida que revisar
+        botonRevisar.classList.toggle('oculto', detallePartida.length === 0);
 
         let mensaje = '';
         if (porcentaje >= 90) {
@@ -435,6 +521,227 @@
 
         pantallaQuiz.classList.add('oculto');
         pantallaFinal.classList.remove('oculto');
+    }
+
+    /* ---------------------------------------------------------- revisión */
+
+    /**
+     * Traduce el resultado de una pregunta a la etiqueta que se muestra.
+     */
+    function resultadoDe(pregunta) {
+        if (!pregunta.contestada) {
+            return 'sin-contestar';
+        }
+        return pregunta.acertada ? 'acierto' : 'fallo';
+    }
+
+    /**
+     * Devuelve las preguntas del detalle que cumplen el filtro activo.
+     */
+    function preguntasFiltradas(detalle, filtro) {
+        if (filtro === 'todas') {
+            return detalle;
+        }
+        return detalle.filter(function (pregunta) {
+            if (filtro === 'acertadas') {
+                return pregunta.contestada && pregunta.acertada;
+            }
+            if (filtro === 'falladas') {
+                return pregunta.contestada && !pregunta.acertada;
+            }
+            if (filtro === 'sin-contestar') {
+                return !pregunta.contestada;
+            }
+            return true;
+        });
+    }
+
+    /**
+     * Pinta una pregunta dentro de la ventana de revisión.
+     *
+     * La opción correcta se marca en verde y la elegida cuando es
+     * incorrecta en rojo. Las preguntas sin contestar se muestran sin ningún
+     * color y sin explicación: no se adelanta la respuesta correcta.
+     */
+    function pintarPreguntaRevision(pregunta, numero) {
+        const resultado = resultadoDe(pregunta);
+        const contestada = Boolean(pregunta.contestada);
+
+        const articulo = document.createElement('article');
+        articulo.className = 'revision-pregunta';
+        articulo.setAttribute('data-resultado', resultado);
+
+        const cabecera = document.createElement('div');
+        cabecera.className = 'revision-cabecera-pregunta';
+
+        const titulo = document.createElement('span');
+        titulo.className = 'revision-numero';
+        titulo.textContent = 'PREGUNTA ' + numero;
+
+        const etiqueta = document.createElement('span');
+        etiqueta.className = 'revision-resultado';
+        etiqueta.textContent = resultado === 'acierto'
+            ? 'ACIERTAS'
+            : (resultado === 'fallo' ? 'FALLO' : 'SIN CONTESTAR');
+
+        cabecera.appendChild(titulo);
+        cabecera.appendChild(etiqueta);
+        articulo.appendChild(cabecera);
+
+        const enunciado = document.createElement('h3');
+        enunciado.className = 'revision-enunciado';
+        enunciado.textContent = pregunta.pregunta;
+        articulo.appendChild(enunciado);
+
+        const lista = document.createElement('ul');
+        lista.className = 'revision-opciones';
+
+        (pregunta.opciones || []).forEach(function (texto, indice) {
+            const item = document.createElement('li');
+            item.className = 'revision-opcion';
+
+            const esCorrecta = indice === pregunta.correcta;
+            const esElegida = indice === pregunta.elegida;
+
+            // Se guardan como atributos para poder comprobarlas sin mirar
+            // las clases de color
+            item.setAttribute('data-correcta', esCorrecta ? 'si' : 'no');
+            item.setAttribute('data-elegida', esElegida ? 'si' : 'no');
+
+            // Sin contestar no se muestra ningún color: no se adelanta la
+            // respuesta correcta
+            if (contestada && esCorrecta) {
+                item.classList.add('correcta');
+            } else if (contestada && esElegida) {
+                item.classList.add('elegida');
+            }
+
+            item.appendChild(document.createTextNode(texto));
+
+            if (esCorrecta || esElegida) {
+                const marca = document.createElement('span');
+                marca.className = 'revision-marca';
+                if (esCorrecta && esElegida) {
+                    marca.textContent = '< CORRECTA · TU RESPUESTA';
+                } else if (esCorrecta) {
+                    marca.textContent = '< CORRECTA';
+                } else {
+                    marca.textContent = '< TU RESPUESTA';
+                }
+                item.appendChild(marca);
+            }
+
+            lista.appendChild(item);
+        });
+
+        articulo.appendChild(lista);
+
+        // Sin contestar no se muestra la explicación
+        if (contestada) {
+            const explicacion = document.createElement('p');
+            explicacion.className = 'revision-explicacion';
+
+            const rotulo = document.createElement('span');
+            rotulo.className = 'explicacion-titulo';
+            rotulo.textContent = '> EXPLICACIÓN';
+            explicacion.appendChild(rotulo);
+            explicacion.appendChild(
+                document.createTextNode(pregunta.explicacion || '')
+            );
+
+            articulo.appendChild(explicacion);
+        }
+
+        return articulo;
+    }
+
+    /**
+     * Pinta el resumen de la revisión (aciertos, fallos y sin contestar).
+     */
+    function pintarResumen(detalle) {
+        const resumen = resumirDetalle(detalle);
+
+        revisionResumen.innerHTML = '';
+
+        const pintada = function (clase, texto) {
+            const trozo = document.createElement('span');
+            trozo.className = clase;
+            trozo.textContent = texto;
+            return trozo;
+        };
+
+        revisionResumen.appendChild(
+            pintada('aciertos', 'ACIERTAS: ' + resumen.acertadas)
+        );
+        revisionResumen.appendChild(document.createTextNode(' · '));
+        revisionResumen.appendChild(
+            pintada('fallos', 'FALLOS: ' + resumen.falladas)
+        );
+        revisionResumen.appendChild(document.createTextNode(' · '));
+        revisionResumen.appendChild(
+            pintada('sin-contestar', 'SIN CONTESTAR: ' + resumen.sinContestar)
+        );
+        revisionResumen.appendChild(
+            document.createTextNode(' · TOTAL: ' + resumen.total)
+        );
+    }
+
+    /**
+     * Dibuja en la ventana la lista de preguntas del filtro activo.
+     */
+    function pintarRevision() {
+        const preguntas = preguntasFiltradas(detalleRevision, filtroRevision);
+
+        revisionLista.innerHTML = '';
+        preguntas.forEach(function (pregunta, indice) {
+            revisionLista.appendChild(
+                pintarPreguntaRevision(pregunta, indice + 1)
+            );
+        });
+
+        revisionVacio.classList.toggle('oculto', preguntas.length > 0);
+    }
+
+    /**
+     * Cambia el filtro de la ventana de revisión.
+     */
+    function filtrarRevision(tipo) {
+        filtroRevision = tipo;
+        revisionFiltros.forEach(function (boton) {
+            boton.classList.toggle('activo', boton.dataset.filtro === tipo);
+        });
+        pintarRevision();
+    }
+
+    /**
+     * Abre la ventana de revisión con el detalle indicado.
+     */
+    function abrirRevision(detalle, origen) {
+        if (!detalle || detalle.length === 0) {
+            return;
+        }
+
+        detalleRevision = detalle;
+        botonOrigenRevision = origen || null;
+
+        pintarResumen(detalle);
+        filtrarRevision(filtroRevision);
+
+        revisionOverlay.classList.remove('oculto');
+        revisionPanel.focus();
+    }
+
+    /**
+     * Cierra la ventana de revisión y devuelve el foco al botón de origen.
+     */
+    function cerrarRevision() {
+        revisionOverlay.classList.add('oculto');
+        revisionLista.innerHTML = '';
+
+        if (botonOrigenRevision && typeof botonOrigenRevision.focus === 'function') {
+            botonOrigenRevision.focus();
+        }
+        botonOrigenRevision = null;
     }
 
     /* -------------------------------------------------------- historial */
@@ -502,6 +809,20 @@
 
                 fila.appendChild(fecha);
                 fila.appendChild(datosFila);
+
+                // Las partidas con detalle guardado se pueden revisar
+                const detalle = partida.detalle;
+                if (Array.isArray(detalle) && detalle.length > 0) {
+                    const boton = document.createElement('button');
+                    boton.className = 'boton boton-revisar';
+                    boton.type = 'button';
+                    boton.textContent = 'REVISAR';
+                    boton.addEventListener('click', function () {
+                        abrirRevision(detalle, boton);
+                    });
+                    fila.appendChild(boton);
+                }
+
                 listaPartidas.appendChild(fila);
             });
         } catch (error) {
@@ -514,12 +835,16 @@
      * Registra la partida terminada en el historial del equipo.
      * Si el registro falla, el resultado se muestra igualmente.
      */
-    async function registrarPartida(aciertos, fallos) {
+    async function registrarPartida(aciertos, fallos, detalle) {
         try {
             await fetch('api/partidas', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ aciertos: aciertos, fallos: fallos })
+                body: JSON.stringify({
+                    aciertos: aciertos,
+                    fallos: fallos,
+                    detalle: detalle || null
+                })
             });
         } catch (error) {
             // El registro es secundario: no impide ver el resultado
@@ -536,6 +861,9 @@
         indice = 0;
         aciertos = 0;
         respondida = [];
+        elegidas = [];
+        detallePartida = [];
+        botonRevisar.classList.add('oculto');
         contadorAciertos.textContent = '0';
         construirPreguntas();
     }
@@ -544,6 +872,7 @@
         // Antes de empezar se espera a que el pool esté cargado: si la carga
         // falla, se sigue con las preguntas fijas de quiz.js
         juegoIniciado = true;
+        cerrarRevision();
         await cargarPool();
 
         // Se reinicia siempre: así una partida nueva nunca hereda el estado
@@ -572,7 +901,9 @@
         }
 
         respondida[actual] = true;
-        if (LETRAS.indexOf(entrada.value) === partida[actual].correcta) {
+        const elegida = LETRAS.indexOf(entrada.value);
+        elegidas[actual] = elegida;
+        if (elegida === partida[actual].correcta) {
             aciertos += 1;
         }
 
@@ -589,8 +920,39 @@
         }
     });
 
+    // Botón de revisión: abre la ventana con la partida terminada
+    botonRevisar.addEventListener('click', function () {
+        abrirRevision(detallePartida, botonRevisar);
+    });
+
+    // Cierre de la ventana de revisión
+    document.getElementById('revision-cerrar').addEventListener('click', cerrarRevision);
+    document.getElementById('revision-cerrar-pie').addEventListener('click', cerrarRevision);
+
+    // Los filtros de la ventana de revisión
+    revisionFiltros.forEach(function (boton) {
+        boton.addEventListener('click', function () {
+            filtrarRevision(boton.dataset.filtro);
+        });
+    });
+
+    // Clic fuera del panel: cierra la ventana de revisión
+    revisionOverlay.addEventListener('click', function (evento) {
+        if (evento.target === revisionOverlay) {
+            cerrarRevision();
+        }
+    });
+
+    // La tecla ESCAPE cierra la ventana de revisión
+    document.addEventListener('keydown', function (evento) {
+        if (evento.key === 'Escape' && !revisionOverlay.classList.contains('oculto')) {
+            cerrarRevision();
+        }
+    });
+
     // Botón de reinicio: vuelve a empezar la partida desde el principio
     botonReiniciar.addEventListener('click', function () {
+        cerrarRevision();
         reiniciarPartida();
         pantallaFinal.classList.add('oculto');
         pantallaQuiz.classList.remove('oculto');
@@ -601,6 +963,7 @@
 
     // Botón INICIO: vuelve a la pantalla de inicio sin seguir jugando
     botonInicio.addEventListener('click', function () {
+        cerrarRevision();
         reiniciarPartida();
         pantallaFinal.classList.add('oculto');
         pantallaQuiz.classList.add('oculto');

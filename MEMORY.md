@@ -3,11 +3,11 @@
 > Solo datos no sensibles: las credenciales viven en `credencial.yaml` (ignorado
 > por git). Plantilla en `credencial.example.yaml`.
 
-## Estado actual (v1 + historial + partidas variables + pool)
+## Estado actual (v1 + historial + partidas variables + pool + revisión)
 - Flujo completo: 9 PDF → extracción → troceado → embeddings → **2555 chunks**
   (2090 texto / 465 tabla) en PostgreSQL 18 + pgvector 0.8.0 → **30 preguntas**
-  en `js/quiz.js` → frontend retro 80s → `npx playwright test` **26 tests** (19
-  del quiz + 7 del pool) y `backend/test_pool.py` **24/24 ✅**.
+  en `js/quiz.js` → frontend retro 80s → `npx playwright test` **35 tests** (19
+  del quiz + 7 del pool + 9 de la revisión) y `backend/test_pool.py` **35/35 ✅**.
 - Modelos Ollama: `locusai/all-minilm-l6-v2:latest` (embeddings, 384 dims) y
   `qwen3.8:27b` (preguntas: ~60 s por lote de 3 → ~20 min el total).
 - **Pool grande (spec 003)**: `js/quiz_pool.json` con **600 preguntas** para que
@@ -41,12 +41,30 @@
   el modelo devolvía un objeto y rompía el parser. Validación de respaldo por
   solapamiento de palabras significativas con el fragmento origen; barajado
   reproducible (semilla `20240517`).
+- **Revisión de la partida (spec 004)**: al terminar, el botón REVISAR
+  PARTIDA abre una modal con las 30 preguntas, la correcta en verde, la
+  elegida en rojo y la explicación, con filtros y resumen. El detalle se
+  guarda en el historial (`data/partidas.json`) para repasar partidas
+  anteriores desde el inicio; solo las **20 más recientes** conservan el
+  detalle (de las anteriores se poda, pero no se pierden).
+- **La opción elegida se guarda al contestar**, no al terminar: en el evento
+  `change` se apuntan `elegidas[i]` y `acertadas[i]`, y el detalle se arma
+  al final. Así no hay que leer el DOM (que puede haber cambiado) para saber
+  qué se eligió.
+- **En la revisión, una pregunta sin contestar sale SIN color y SIN
+  explicación**: manda la regla global de no adelantar la respuesta correcta.
+  Las opciones llevan `data-correcta` y `data-elegida` para poder comprobarlas
+  en las pruebas sin depender de las clases de color.
 - **Pool de preguntas en `js/quiz_pool.json`** (spec 003): el juego elige 30
   preguntas al azar del pool en cada partida, baraja el orden de las preguntas
   y el de las opciones (recalculando `correcta`) y **evita que dos preguntas de
   la misma partida repitan opciones** (son las que delatan la respuesta). El
   pool se genera **una sola vez, offline**: jugar no necesita ni Ollama ni
   PostgreSQL ni red.
+- **Las explicaciones del pool se pueden reescribir** con
+  `--mejorar-explicaciones`: las que dicen "el texto" o "el pasaje" (65 de
+  600) se reescriben para que se entiendan solas en la revisión. Si la
+  nueva no supera la validación, se conserva la anterior.
 - **OpenRouter para generar el pool** (`minimax/minimax-m3.1-flash:free`):
   con el modelo local de 27B en CPU cada pregunta tardaba ~29 s (5 h para 600);
   con el modelo remoto son ~6 s. La clave se lee de la variable de entorno

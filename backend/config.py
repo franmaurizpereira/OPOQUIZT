@@ -29,7 +29,9 @@ URL_OLLAMA = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 # modelo remoto en vez del modelo local de Ollama. Es mucho más rápido,
 # aunque el juego sigue funcionando sin conexión: el pool ya está generado.
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
-MODELO_LLM_OPENROUTER = "minimax/minimax-m3.1-flash:free"
+MODELO_LLM_OPENROUTER = os.environ.get(
+    "OPENROUTER_MODEL", "minimax/minimax-m3.1-flash:free"
+)
 URL_OPENROUTER = "https://openrouter.ai/api/v1/chat/completions"
 # Identificación de la aplicación en OpenRouter (opcional pero recomendable)
 OPENROUTER_TITULO = "OPOQUIZ"
