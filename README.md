@@ -15,27 +15,38 @@ años 50 (Fallout).
 
 ## Capturas
 
-**Pantalla de inicio** con el historial de las últimas partidas:
+**Pantalla de inicio** con el historial de las últimas partidas: fecha, aciertos
+en verde y fallos en rojo. Las partidas que guardan su detalle tienen un botón
+**REVISAR**.
 
 ![Pantalla de inicio](docs/capturas/inicio.jpg)
 
-**Pregunta contestada**: la opción correcta en verde, la fallada en rojo y la
-explicación del por qué:
+**Pregunta sin contestar**: ninguna opción lleva color, porque no se puede
+adelantar la respuesta correcta ni su explicación.
+
+![Pregunta sin contestar](docs/capturas/quiz-inicio.jpg)
+
+**Pregunta acertada**: la opción correcta en verde, con su marca de acierto, y la
+explicación del por qué.
 
 ![Pregunta acertada](docs/capturas/quiz-acierto.jpg)
 
+**Pregunta fallada**: la elegida en rojo, la correcta en verde y la explicación.
+
 ![Pregunta fallada](docs/capturas/quiz-fallo.jpg)
 
-**Pantalla final** con la puntuación, la revisión y el reinicio:
+**Pantalla final** con la puntuación, el botón para revisar la partida, el de
+volver a empezar y el de volver al inicio.
 
 ![Pantalla final](docs/capturas/final.jpg)
 
 **Revisión de la partida**: las 30 preguntas con la correcta, la elegida y la
-explicación, filtrables por acierto, fallo o sin contestar:
+explicación de cada una, filtrables por acierto, fallo o sin contestar.
 
 ![Revisión de la partida](docs/capturas/revision.jpg)
 
-**Vista móvil** (390 px):
+**Vista móvil** (390 px): el enunciado, las opciones y la explicación siguen
+leyéndose sin desbordar.
 
 ![Vista móvil](docs/capturas/movil-quiz.jpg)
 

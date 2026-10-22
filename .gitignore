@@ -9,6 +9,7 @@ node_modules/
 # Resultados de las pruebas de Playwright
 test-results/
 playwright-report/
+.playwright-mcp/
 
 # Credenciales de la base de datos (NUNCA versionar)
 credencial.yaml
