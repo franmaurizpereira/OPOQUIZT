@@ -115,6 +115,12 @@ pool cuando está disponible y que, si no lo está, sigue jugando con
 `js/quiz.js`. Los dos primeros tests exigen que `js/quiz_pool.json` exista
 con al menos 500 preguntas: si todavía no se ha generado, fallan.
 
+Las pruebas del sonido (`tests/sonido.spec.js`) no pueden oír nada en un
+navegador sin altavoces: comprueban los contadores que expone
+`window.OPOQUIZ_AUDIO` (un efecto por acción, ninguno antes del primer gesto,
+ninguno con el sonido apagado) y que, sin Web Audio, la partida sigue
+funcionando. En total son **45 pruebas** de Playwright.
+
 Las pruebas unitarias del generador del pool (sin necesidad de Ollama ni de
 la base de datos) se ejecutan con:
 
@@ -173,6 +179,24 @@ Las partidas jugadas quedan guardadas con su detalle en el historial, así que
 también se pueden repasar desde la pantalla de inicio (botón **REVISAR**).
 Del historial solo se conserva el detalle de las 20 partidas más recientes;
 de las anteriores se guarda la fecha y la puntuación.
+
+## Sonido
+
+La aplicación tiene efectos de sonido en todas las pantallas: al empezar o
+reiniciar una partida, al contestar, al avanzar de pregunta, al abrir y cerrar
+la revisión y al terminar (el tono final cambia según la puntuación).
+
+- Los sonidos se **sintetizan** en el navegador con Web Audio (`js/audio.js`):
+  no hay ficheros de audio, así que no añaden peso al repositorio, no necesitan
+  licencia y el juego sigue funcionando **sin red**.
+- El timbre imita relés, válvulas y teletipo, no chips de 8 bits.
+- **No hay música ni zumbido de fondo**: solo efectos puntuales.
+- El control **SONIDO: SÍ/NO** está en la cabecera, se recuerda entre visitas
+  (`localStorage`) y tiene el atajo de teclado **M**.
+- Nada suena antes del primer clic: es lo que exige el navegador para permitir
+  el audio, y así la página no hace ruido sola al abrirse.
+- El sonido **nunca es el único canal**: los aciertos y fallos se siguen
+  distinguiendo por color, borde, marca e icono.
 
 ### Generar el pool de preguntas
 
@@ -273,6 +297,7 @@ El trabajo se apoya en `specs/NNN-nombre/`, con `spec.md` (qué y por qué),
 │   ├── quizlib.min.js         ← librería de quiz (Quiz.Classes, checkAnswers)
 │   ├── quiz.js                ← datos de las 30 preguntas de respaldo (quizData)
 │   ├── quiz_pool.json         ← pool grande de preguntas (opcional, generado)
+│   ├── audio.js               ← efectos de sonido sintetizados (Web Audio)
 │   └── app.js                 ← lógica de la aplicación
 ├── backend/
 │   ├── db.sql                 ← extensión pgvector y tabla chunks
@@ -289,6 +314,7 @@ El trabajo se apoya en `specs/NNN-nombre/`, con `spec.md` (qué y por qué),
 ├── tests/quiz.spec.js         ← pruebas de Playwright del quiz
 ├── tests/pool.spec.js         ← pruebas de Playwright del pool
 ├── tests/revision.spec.js     ← pruebas de Playwright de la revisión
+├── tests/sonido.spec.js       ← pruebas de Playwright del sonido
 ├── tests/fixtures/pool.js     ← pool de prueba para las pruebas
 ├── playwright.config.js       ← configuración de Playwright
 ├── package.json               ← dependencias de Node (solo tests)

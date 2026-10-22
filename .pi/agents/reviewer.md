@@ -38,9 +38,22 @@ que el Coordinator usará para reabrir la tarea si procede.
 ### Idioma y estilo
 - [ ] **100 % de la UI en español** (botones, mensajes, etiquetas,
       preguntas, explicaciones).
-- [ ] Estilo **retro años 80**: fondo oscuro, acentos neón, tipografía
-      monoespaciada / pixel, bordes pixelados.
+- [ ] Estilo **retro-futurismo de los años 50 (Fallout)**: fondo marrón
+      carbón, paneles con borde doble, azul Vault Boy, naranja de menús,
+      tipografías locales (Anton, Oswald, Courier Prime, VT323).
 - [ ] Comentarios del código en español.
+
+### Sonido (spec 006)
+- [ ] **Un solo efecto por acción**: contestar pide un acierto o un fallo,
+      avanzar pide un avance, cerrar la partida pide un cierre.
+- [ ] Nada suena antes del primer gesto del jugador.
+- [ ] Existe control visible **SONIDO: SÍ/NO** en todas las pantallas, con
+      `aria-pressed`, foco visible y atajo `M`.
+- [ ] Con el sonido apagado no se reproduce nada y la preferencia se
+      recuerda tras recargar.
+- [ ] Sin Web Audio la partida se juega igual y sin errores de consola.
+- [ ] Sin ficheros de audio nuevos ni dependencias: los efectos se
+      sintetizan con Web Audio.
 
 ### Salud general
 - [ ] `quizlib.min.js` no modificado (salvo justificación).

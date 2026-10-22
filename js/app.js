@@ -61,6 +61,59 @@
     );
     const botonRevisar = document.getElementById('boton-revisar');
 
+    // Sonido: los efectos sintetizados de js/audio.js
+    const sonido = window.OPOQUIZ_AUDIO || null;
+    const botonSonido = document.getElementById('boton-sonido');
+
+    /**
+     * Pide un efecto de sonido. Si el módulo no está disponible (navegador
+     * antiguo o fichero no cargado), el juego sigue igual: no es crítico.
+     */
+    function sonar(nombre) {
+        if (sonido && typeof sonido.reproducir === 'function') {
+            sonido.reproducir(nombre);
+        }
+    }
+
+    /**
+     * Pinta el control de sonido según el estado del módulo: texto, clase
+     * y aria-pressed. El estado se escribe, no solo se colorea.
+     */
+    function pintarBotonSonido() {
+        if (!botonSonido) {
+            return;
+        }
+        if (!sonido) {
+            // Sin módulo de sonido no hay nada que ofrecer
+            botonSonido.classList.add('oculto');
+            return;
+        }
+
+        const encendido = sonido.estaActivo();
+        botonSonido.setAttribute('aria-pressed', encendido ? 'true' : 'false');
+        botonSonido.classList.toggle('apagado', !encendido);
+
+        const texto = botonSonido.querySelector('.sonido-texto');
+        if (texto) {
+            texto.textContent = encendido ? 'SONIDO: SÍ' : 'SONIDO: NO';
+        }
+    }
+
+    /**
+     * Enciende o apaga el sonido y deja el control al día.
+     */
+    function alternarSonido() {
+        if (!sonido) {
+            return;
+        }
+        const encendido = sonido.alternar();
+        pintarBotonSonido();
+        if (encendido) {
+            // Al encenderlo se confirma con un clic (al apagarlo ya no suena)
+            sonar('clic-ui');
+        }
+    }
+
     // Estado de la partida
     let indice = 0;
     let aciertos = 0;
@@ -519,6 +572,9 @@
         }
         resultadoTexto.textContent = mensaje;
 
+        // Cierre de partida: el efecto depende del tramo de puntuación
+        sonar(porcentaje >= 90 ? 'final-bien' : (porcentaje >= 50 ? 'final-medio' : 'final-mal'));
+
         pantallaQuiz.classList.add('oculto');
         pantallaFinal.classList.remove('oculto');
     }
@@ -729,14 +785,23 @@
 
         revisionOverlay.classList.remove('oculto');
         revisionPanel.focus();
+        sonar('modal-abrir');
     }
 
     /**
      * Cierra la ventana de revisión y devuelve el foco al botón de origen.
      */
     function cerrarRevision() {
+        // Solo suena si de verdad había una ventana abierta: este método se
+        // llama también al empezar o reiniciar la partida
+        const estabaAbierta = !revisionOverlay.classList.contains('oculto');
+
         revisionOverlay.classList.add('oculto');
         revisionLista.innerHTML = '';
+
+        if (estabaAbierta) {
+            sonar('modal-cerrar');
+        }
 
         if (botonOrigenRevision && typeof botonOrigenRevision.focus === 'function') {
             botonOrigenRevision.focus();
@@ -869,6 +934,10 @@
     }
 
     botonEmpezar.addEventListener('click', async function () {
+        // El arranque suena dentro del propio gesto: es el momento en el que
+        // el navegador permite crear el contexto de audio
+        sonar('arranque');
+
         // Antes de empezar se espera a que el pool esté cargado: si la carga
         // falla, se sigue con las preguntas fijas de quiz.js
         juegoIniciado = true;
@@ -903,9 +972,14 @@
         respondida[actual] = true;
         const elegida = LETRAS.indexOf(entrada.value);
         elegidas[actual] = elegida;
-        if (elegida === partida[actual].correcta) {
+        const acertada = elegida === partida[actual].correcta;
+        if (acertada) {
             aciertos += 1;
         }
+
+        // Un único efecto por pregunta, y aquí: comprobarYMarcas() recorre
+        // las 30 preguntas en cada respuesta, así que sonaría de más
+        sonar(acertada ? 'acierto' : 'fallo');
 
         comprobarYMarcas();
         contadorAciertos.textContent = String(aciertos);
@@ -915,7 +989,9 @@
     botonSiguiente.addEventListener('click', function () {
         if (indice < TOTAL - 1) {
             mostrarPregunta(indice + 1);
+            sonar('avance');
         } else {
+            // En la última pregunta el sonido es el de cierre de partida
             mostrarFinal();
         }
     });
@@ -932,6 +1008,7 @@
     // Los filtros de la ventana de revisión
     revisionFiltros.forEach(function (boton) {
         boton.addEventListener('click', function () {
+            sonar('clic-ui');
             filtrarRevision(boton.dataset.filtro);
         });
     });
@@ -947,13 +1024,28 @@
     document.addEventListener('keydown', function (evento) {
         if (evento.key === 'Escape' && !revisionOverlay.classList.contains('oculto')) {
             cerrarRevision();
+            return;
         }
+
+        // Atajo M: enciende o apaga el sonido
+        if (evento.ctrlKey || evento.altKey || evento.metaKey) {
+            return;
+        }
+        if (String(evento.key).toLowerCase() !== 'm') {
+            return;
+        }
+        const destino = evento.target;
+        if (destino && (destino.tagName === 'TEXTAREA' || destino.isContentEditable)) {
+            return;
+        }
+        alternarSonido();
     });
 
     // Botón de reinicio: vuelve a empezar la partida desde el principio
     botonReiniciar.addEventListener('click', function () {
         cerrarRevision();
         reiniciarPartida();
+        sonar('arranque');
         pantallaFinal.classList.add('oculto');
         pantallaQuiz.classList.remove('oculto');
         mostrarPregunta(0);
@@ -965,12 +1057,21 @@
     botonInicio.addEventListener('click', function () {
         cerrarRevision();
         reiniciarPartida();
+        sonar('clic-ui');
         pantallaFinal.classList.add('oculto');
         pantallaQuiz.classList.add('oculto');
         pantallaInicio.classList.remove('oculto');
         // El historial se refresca para que la pantalla de inicio esté al día
         cargarHistorial();
     });
+
+    /* --------------------------------------------------------- sonido */
+
+    // El control se pinta desde el primer momento con la preferencia guardada
+    if (botonSonido) {
+        botonSonido.addEventListener('click', alternarSonido);
+    }
+    pintarBotonSonido();
 
     /* ---------------------------------------------------------- inicio */
 

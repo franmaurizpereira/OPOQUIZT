@@ -6,8 +6,8 @@
 ## Estado actual
 - Flujo completo: 9 PDF → extracción → troceado → embeddings → **2555 chunks**
   (2090 texto / 465 tabla) en PostgreSQL 18 + pgvector 0.8.0 → 30 preguntas en
-  `js/quiz.js` → frontend Fallout 50s → `npx playwright test` **35/35**
-  (19 quiz + 7 pool + 9 revisión) y `backend/test_pool.py` **35/35 ✅**.
+  `js/quiz.js` → frontend Fallout 50s → `npx playwright test` **45/45**
+  (19 quiz + 7 pool + 9 revisión + 10 sonido) y `backend/test_pool.py` **35/35 ✅**.
 - Modelos Ollama: `locusai/all-minilm-l6-v2:latest` (embeddings, 384 dims) y
   `qwen3.8:27b` (preguntas: ~60 s por lote de 3 → ~20 min el total).
 - **Pool de 600 preguntas** (`js/quiz_pool.json`, spec 003): cada partida sale
@@ -20,6 +20,10 @@
   modal con las 30 preguntas, la correcta, la elegida y la explicación, con
   filtros y resumen. El detalle se guarda en `data/partidas.json` y se puede
   repasar desde el inicio; solo las **20 más recientes** lo conservan.
+- **Sonido** (spec 006): efectos **sintetizados** con Web Audio en
+  `js/audio.js` (0 ficheros, 0 red). Un solo efecto por acción, nada antes del
+  primer gesto, control `SONIDO: SÍ/NO` en la cabecera con atajo `M` y
+  preferencia en `localStorage` (`opoquiz-sonido`). Sin música de fondo.
 
 ## Reglas permanentes (no negociables)
 - **Una pregunta sin contestar NO muestra ningún color** ni explicación: no se
@@ -32,10 +36,16 @@
   fuentes viven en `css/fuentes/` con su licencia OFL.
 - Los estados de acierto y fallo **nunca se comunican solo con color**: van
   con borde, fondo o icono.
+- El **sonido nunca es el único canal**: refuerza, no informa. Siempre hay
+  control visible, con el estado escrito, y nada suena antes del primer gesto.
 - La web se sirve **solo** con `backend/server.py`: publica `index.html`,
   `css/` y `js/`, nunca el resto del proyecto.
 
 ## Decisiones y por qué
+- **Sonido sintetizado, no ficheros**: con Web Audio no entra ni un byte de
+audio en el repositorio, no hay licencias que documentar y no hay que abrir
+carpetas nuevas en `server.py`. Descartado servir `.ogg` (100–300 KB + CC0 +
+whitelist del servidor).
 - **pgvector a mano**: el paquete de Fedora no coincidía con el `sharedir` de
   PostgreSQL 18 (PGDG); se copiaron `vector*` y `vector.so` a `/usr/pgsql-18/`.
   **Repetir tras cada actualización de PostgreSQL**.

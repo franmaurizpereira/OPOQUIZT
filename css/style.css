@@ -250,6 +250,62 @@ body::after {
     box-shadow: 0 0 10px rgba(242, 169, 0, 0.3);
 }
 
+/* ------------------------------------------------------------- sonido */
+
+/* Placa del interruptor de sonido: va en la cabecera, en el flujo normal,
+   para no tapar el título en pantallas pequeñas */
+.sonido {
+    display: flex;
+    justify-content: center;
+    margin-top: 14px;
+}
+
+.boton-sonido {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 15px;
+    font-family: var(--fuente-rotulo);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--texto);
+    background: var(--fondo-panel);
+    border: 1px solid var(--borde-panel);
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 2px 0 var(--negro);
+    transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+
+.boton-sonido:hover {
+    color: var(--naranja);
+    border-color: var(--naranja);
+}
+
+.boton-sonido:focus-visible {
+    outline: 3px solid var(--azul-claro);
+    outline-offset: 3px;
+}
+
+.sonido-altavoz {
+    flex: none;
+    color: var(--naranja);
+}
+
+/* Apagado: lo dice el texto, lo dice el borde discontinuo y además el
+   altavoz pierde color. Nunca se comunica solo con color */
+.boton-sonido.apagado {
+    color: var(--texto-tenue);
+    border-style: dashed;
+}
+
+.boton-sonido.apagado .sonido-altavoz {
+    color: var(--texto-tenue);
+    opacity: 0.7;
+}
+
 /* ------------------------------------------------------------ pantallas */
 
 .contenedor {
@@ -1099,6 +1155,7 @@ body::after {
 
     .boton,
     .boton-secundario,
+    .boton-sonido,
     .opcion,
     .opcion input[type="radio"] {
         transition: none;
@@ -1133,6 +1190,12 @@ body::after {
     .subtitulo {
         letter-spacing: 2px;
         font-size: 0.72rem;
+    }
+
+    .boton-sonido {
+        padding: 6px 12px;
+        font-size: 0.66rem;
+        letter-spacing: 1px;
     }
 
     .cabecera::after {

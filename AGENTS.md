@@ -71,6 +71,14 @@ Estas son inquebrantables, sin excepción:
    ficheros de fuente van en `css/fuentes/` con su licencia OFL.
 6. **Los estados de acierto y fallo nunca se comunican solo con color**:
    van siempre acompañados de borde, fondo o icono.
+7. **El sonido tampoco es el único canal**: refuerza, no informa. Siempre
+   hay un control de sonido visible con el estado escrito
+   (`SONIDO: SÍ`/`SONIDO: NO`), atajo `M` y `aria-pressed`. Nada suena
+   antes del primer gesto del jugador, el sonido se recuerda entre
+   visitas (`localStorage`) y **no hay música ni bucle de fondo**.
+8. **El audio se sintetiza** con Web Audio (`js/audio.js`): nada de
+   ficheros de audio, ni binarios, ni licencias nuevas, para no romper la
+   regla de funcionar sin red.
 El detalle técnico de cada capa (stack, formato de datos, BD,
 comportamiento del quiz) está en el fichero de cada agente.
 ## 6. Orden de trabajo sugerido (roadmap)
@@ -88,6 +96,14 @@ Cualquier tarea que toque el quiz o `quiz.js` cierra únicamente si:
 - Todos los textos visibles están en español y el estilo es el Fallout/50s.
 - `npx playwright test` pasa todas las pruebas
   (Chromium desde `~/.cache/ms-playwright/chromium-1248/`).
+
+Cualquier tarea que toque el sonido cierra únicamente si:
+- Se pide **un solo efecto por acción** (comprobado con los contadores de
+  `window.OPOQUIZ_AUDIO`, no a oído).
+- No se crea contexto de audio antes del primer gesto del jugador.
+- Con el sonido apagado no se reproduce nada y la preferencia se recuerda.
+- Sin `AudioContext` la partida se juega igual y sin errores de consola.
+- El control de sonido cumple AA y está en español.
 
 Cualquier tarea que toque `css/style.css` cierra únicamente si:
 - El Reviewer de estilo emite **VEREDICTO: APROBADO** (gates 0‑4).
