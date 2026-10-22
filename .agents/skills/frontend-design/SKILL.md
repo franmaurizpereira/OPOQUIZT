@@ -1,26 +1,26 @@
 ---
 name: frontend-design
-description: Guía de diseño visual para OPOQUIZ (quiz retro de los años 80 sobre Administración Pública). Aporta criterio para construir o retocar interfaces con estética CRT, tipografía monoespaciada, acentos neón y Pixel Art, sin recurrir a frameworks ni librerías CSS modernas. Úsala al crear o modificar index.html, css/style.css o js/app.js.
-license: Complete terms in LICENSE.txt
+description: Guía de diseño visual para OPOQUIZ (quiz retro-futurista de los años 50 sobre Administración Pública). Aporta criterio para construir o retocar interfaces con estética Fallout, tipografías locales, paleta de vault y Pixel Art, sin recurrir a frameworks ni librerías CSS modernas. Úsala al crear o modificar index.html, css/style.css o js/app.js.
+license: Complete terms in LICENSE.txt.
 ---
 
 # Diseño frontend en OPOQUIZ
 
-Adaptación de la skill `frontend-design` de Anthropic al proyecto OPOQUIZ. La
-versión original está en `UPSTREAM.md` (consulta solo como referencia de
+Adaptación de la skill `frontend-design` de Anthropic al proyecto OPOQUIZ.
+La versión original está en `UPSTREAM.md` (consulta solo como referencia de
 metodología; este fichero es el que manda).
 
 ## 0. Prioridad de las reglas
 
-1. **La sección 3 de `AGENTS.md` es inquebrantable**: comentarios y textos de
-   interfaz en español, estética retro de los años 80, sin frameworks ni
-   librerías CSS modernas.
+1. **La sección 5 de `AGENTS.md` es inquebrantable**: comentarios y textos de
+   interfaz en español, estética **retro-futurismo de los años 50 (Fallout)**,
+   sin frameworks ni librerías CSS modernas.
 2. Esta skill **no sustituye** esas reglas: las hace aplicables. Cuando una
-   recomendación genérica de la skill original contradiga el retro 80s, gana el
-   retro 80s.
+   recomendación genérica de la skill original contradiga el estilo Fallout,
+   gana el Fallout.
 3. Todo el frontend es **HTML + CSS + JS vanilla + `js/quizlib.min.js`**. Nada
-   de React, Tailwind, Bootstrap, Google Fonts ni CDN externos: el quiz debe
-   funcionar abriendo `index.html` sin red.
+   de React, Tailwind ni Bootstrap. **El juego funciona sin red**: ni fuentes
+   remotas ni imágenes externas.
 
 ## 1. El asunto: qué es OPOQUIZ
 
@@ -35,11 +35,10 @@ Antes de tocar una pantalla, ten claro el sujeto y para quién es:
   con prisas.
 - **Su trabajo principal**: responder 30 preguntas, ver si ha acertado y leer
   la explicación. Todo lo demás es decorado y no debe estorbar.
-- **El material y el lenguaje**: la pantalla de la interfaz es un **monitor CRT
-  de una computadora de los 80**: fósforo verde, cian, magenta y amarillo sobre
-  negro; cuadrícula de rejilla; scanlines; tipografía de máquina de escribir;
-  bordes con esquinas escalonadas (pixel art). Ese es el motivo por el que
-  la interfaz **es** lo que es: no es un adorno, es el concepto.
+- **El material y el lenguaje**: la interfaz es el **panel de control de un
+  vault de los años 50**: cartón beige‑marrón, menús naranja, marcador
+  azul de Vault Boy, rótulos de terminal en verde pixelado. Ese es el motivo
+  por el que la interfaz **es** lo que es: no es un adorno, es el concepto.
 
 ## 2. La casa: tokens obligatorios
 
@@ -48,73 +47,66 @@ introduzcas colores sueltos ni reescribas la paleta.
 
 | Token | Valor | Uso |
 |---|---|---|
-| `--fondo` | `#05060f` | Fondo del monitor |
-| `--fondo-panel` | `#0b1022` | Panel de la partida |
-| `--neon-lima` | `#39ff14` | Aciertos, acción principal, explicación |
-| `--neon-cian` | `#00e5ff` | Estructura: bordes, progreso, títulos de sección |
-| `--neon-magenta` | `#ff2bd6` | Contrapunto y sombras duras |
-| `--neon-amarillo` | `#ffe600` | Enunciado de la pregunta |
-| `--verde` / `--rojo` | `#25ff7a` / `#ff2b4e` | Respuesta correcta / fallada |
-| `--fuente` | monoespaciada | Única familia tipográfica |
+| `--fondo` | `#1a1714` | Fondo (marrón carbón) |
+| `--fondo-panel` | `#2e2820` | Paneles y tarjetas |
+| `--borde-panel` | `#4a4034` | Borde exterior de los paneles |
+| `--azul` / `--azul-claro` | `#2f7fd4` / `#4aa3e8` | Acentos Vault Boy, progreso, botones secundarios |
+| `--naranja` / `--naranja-oscuro` | `#f2a900` / `#e08b1d` | Botones primarios y títulos |
+| `--verde` / `--verde-texto` | `#7ec850` / `#9ada6a` | Respuesta correcta |
+| `--rojo` / `--rojo-texto` | `#d0433a` / `#ef7a6f` | Respuesta incorrecta |
+| `--texto` / `--texto-tenue` | `#e8dcc8` / `#a89880` | Texto principal y secundario |
+| `--fuente-cartel` | Anton | Títulos |
+| `--fuente-rotulo` | Oswald | Rótulos y botones |
+| `--fuente-cuerpo` | Courier Prime | Enunciados y explicaciones |
+| `--fuente-terminal` | VT323 | Detalles "terminal" |
 
 Reglas de casa (heredadas de `AGENTS.md`):
 
-- Fondo oscuro, siempre. Nunca fondo crema ni claro.
-- Acentos neón: verde lima, cian, magenta, amarillo. Nada de terracota ni tonos
-  cálidos.
-- Tipografía **monoespaciada** (`"Courier New", "Lucida Console", monospace`).
-  Si alguna vez necesitas una segunda familia, tendría que ser una pixel font
-  local y claramente distinta, nunca la "sans por defecto".
-- Bordes pixelados: usa `clip-path` con escalones de 4–10 px, no `border-radius`
-  suave.
-- Efecto de scanlines mediante `repeating-linear-gradient` en un overlay
-  `position: fixed; pointer-events: none`.
-- Sin sombras difusas suaves estilo SaaS: la sombra es dura y desplazada
-  (`box-shadow: 4px 4px 0 ...`).
-- Sin `linear-gradient` decorativo de fondo tipo "lavanda" ni rejilla de
-  gradientes modernistas.
+- Fondo oscuro y cálido, siempre. Nunca fondo crema ni claro.
+- Acentos: **azul Vault Boy y naranja de menú**. Nada de neón lima, cian ni
+  magenta: ese era el estilo anterior (spec 003) y ya no manda.
+- **Cuatro familias tipográficas**, todas locales en `css/fuentes/`:
+  cartel (títulos), rótulo (etiquetas y botones), cuerpo (texto largo) y
+  terminal (detalles pixelados). No añadas una quinta.
+- Bordes: grosor de 2‑3 px, esquinas de 4‑8 px (nunca 0, nunca muy
+  redondeadas), y **doble borde** en los paneles (grueso oscuro + línea fina
+  interior).
+- Texturas solo con `background` y gradientes: grano de película, viñeta y
+  scanlines. **Ninguna imagen externa**.
+- Sombras duras, nunca difusas estilo SaaS.
 
 ## 3. Principios de diseño (adaptados)
 
 ### La tipografía lleva la personalidad
 
-Una sola familia monoespaciada bien tratada es mejor que dos familias
-genéricas. Trabaja con:
-
-- **Escala**: títulos grandes con `letter-spacing` amplio (4–6 px) y pesos 700;
-  enunciados de pregunta en 1.05 rem; etiquetas en 0.78–0.9 rem.
+- **Escala**: títulos grandes en cartel con `letter-spacing` amplio (4‑7 px);
+  enunciados de pregunta en 1.05 rem; rótulos de estado en VT323.
 - **Longitud de línea**: en este proyecto manda la legibilidad de un enunciado
-  largo; usa `max-width` de 60–75 caracteres y `line-height` 1.5–1.7.
+  largo; usa `max-width` de 60‑75 caracteres y `line-height` 1.5‑1.7.
 - **Alineación**: a la **izquierda** para enunciados y opciones; centrado solo
   para la pantalla de bienvenida, la puntuación final y el pie.
-- El tratamiento tipográfico debe ser parte del diseño, no un vehículo neutro:
-  el `text-shadow` con doble desplazamiento (lima + magenta) es el recurso
-  house.
+- El tratamiento tipográfico debe ser parte del diseño, no un vehículo neutro.
 
 ### La estructura visual es información
 
 - Bordes, paneles y la barra de progreso **encuadran** el contenido: separan
   estados (pendiente / respondida / correcta) y no decoran.
-- La barra de progreso es un indicador literal (segmentos de 10 px con brillo
-  neón), no una barra redondeada con degradado.
-- **No uses mayúsculas decorativas fuera de donde el retro las pide**: sí en
+- La barra de progreso es un indicador literal (segmentos con brillo azul).
+- **No uses mayúsculas decorativas fuera de donde el estilo las pide**: sí en
   títulos de pantalla, rótulos de estado (`> EXPLICACIÓN`) y botones; **no** en
   el enunciado de la pregunta ni en las opciones (son texto que se lee, no
-  cromo). Esta es la versión de OPOQUIZ de "evita las mayúsculas en etiquetas":
-  las mayúsculas aquí son un recurso de máquina, no un adorno de plantilla.
-- **No** numeres los elementos (`01 / 02 / 03`) salvo que la secuencia sea real:
-  la numeración solo aparece en `PREGUNTA 7 / 30`, que sí es una secuencia.
+  cromo).
+- **No** numeres los elementos (`01 / 02 / 03`) salvo que la secuencia sea
+  real: la numeración solo aparece en `PREGUNTA 7 / 30`.
 
 ### Movimiento
 
-- El movimiento no disparado por el usuario se usa con lupa: el parpadeo del
-  título (`steps(1)`, 4 s) y la transición escalonada de la barra de progreso
-  (`steps(8)`) son suficientes.
-- **Respeta `prefers-reduced-motion`**: envuelve parpadeos, brillos y
-  transiciones en una media query que los desactive. Es requisito de
-  accesibilidad, no un extra.
+- El movimiento se usa con lupa: transiciones de 120‑200 ms en hover y focus,
+  y el avance de la barra de progreso escalonado.
+- **Respeta `prefers-reduced-motion`**: envuelve transiciones y brillos en
+  una media query que los desactive. Es requisito de accesibilidad.
 - Cada hover y cada foco debe devolver información ("estás aquí"), nunca
-  "`hover` por decoración".
+  "hover por decoración".
 
 ### Contenido real
 
@@ -131,42 +123,43 @@ genéricas. Trabaja con:
    - **Color**: qué tokens de `:root` se usan y con qué jerarquía.
    - **Tipo**: tamaños, pesos y espaciados concretos.
    - **Layout**: esbozo ASCII de la estructura y criterio de alineación.
-   - **Principios**: qué hace que esa pantalla sea "de los 80" y no una más.
-2. **Revisa el plan** contra el brief (aquí, contra `AGENTS.md` y el estilo
-   retro ya existente en `css/style.css`). Si una parte del plan podría
-   aplicarse tal cual a cualquier otra web, revísala: en este proyecto, ese
-   es el signo de que has caído en el default.
+   - **Principios**: qué hace que esa pantalla sea "de los 50" y no una más.
+2. **Revisa** el plan contra el brief (aquí, contra `AGENTS.md` y el estilo
+   Fallout ya existente en `css/style.css`). Si una parte del plan podría
+   aplicarse tal cual a cualquier otra web, revísala: en este proyecto, ese es
+   el signo de que has caído en el default.
 3. **Construye** respetando la estructura existente: `index.html` con la
    jerarquía de pantallas, `css/style.css` con los tokens, `js/app.js` con la
    lógica. No añadas librerías.
 4. **Critica tu propio trabajo**: haz capturas con Playwright
    (`npx playwright test` y el MCP de Playwright) y revísalas. Una captura
-   vale más que mil tokens. Aplica el consejo de Chanel: antes de dar por
-   terminado, quita un adorno.
+   vale más que mil tokens.
 
 ## 5. Errores frecuentes en este proyecto
 
-- Introducir un framework, CDN o Google Font.
+- Introducir un framework, un CDN o una fuente remota.
 - Poner mayúsculas o etiquetas decorativas en el enunciado y las opciones.
-- Usar `border-radius` suave, sombras difusas o degradados de fondo "modernos".
-- Salirse de la paleta: tonos cálidos, grises apagados o acentos nuevos.
+- Usar sombras difusas o degradados "modernos" fuera de los botones.
+- Salirse de la paleta: tonos fríos, grises apagados o acentos nuevos.
 - Poner texto en inglés en la interfaz o en los comentarios.
 - **Marcar en verde la respuesta correcta de una pregunta que aún no se ha
-  contestado**: solo las preguntas respondidas llevan color (verde la correcta,
-  roja la fallada elegida). Es un fallo funcional, no de estilo.
+  contestado**: solo las preguntas respondidas llevan color (verde la
+  correcta, roja la fallada elegida). Es un fallo funcional, no de estilo.
+- **Comunicar el acierto o el fallo solo con color**: siempre van con borde,
+  fondo o icono.
 - Romper el layout responsive: a 360 px de ancho las opciones deben seguir
   leyéndose y sin desbordar.
-- Dejar la interfaz sin foco visible: los botones y las opciones necesitan
-  `:focus-visible` con contorno neón.
+- Dejar la interfaz sin foco visible: botones y opciones necesitan
+  `:focus-visible` con contorno claro.
 
 ## 6. Comprobaciones antes de dar por terminado
 
 - [ ] `npx playwright test` en verde (incluye la prueba de que las preguntas
       sin contestar no muestran ningún color).
 - [ ] Capturas revisadas: pantalla de inicio, pregunta contestada y pantalla
-      final, en móvil (360 px) y escritorio (900 px).
+      final, en móvil (360 px) y escritorio (1280 px).
+- [ ] Contraste AA **medido** en el navegador (4.5:1 en texto normal).
 - [ ] Todo el texto visible en español.
 - [ ] Solo se usan tokens de `:root` y las clases ya existentes.
-- [ ] Sin `border-radius`, sin sombras difusas, sin degradados decorativos,
-      sin librerías nuevas.
-- [ ] Foco visible y `prefers-reduced-motion` respetado.
+- [ ] Sin librerías ni fuentes remotas; foco visible y
+      `prefers-reduced-motion` respetado.

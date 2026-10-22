@@ -289,8 +289,49 @@ test.describe('Historial de partidas', () => {
 
         await expect(aciertos).toHaveText('Aciertos: 21');
         await expect(fallos).toHaveText('Fallos: 9');
-        await expect(aciertos).toHaveCSS('color', 'rgb(37, 255, 122)');
-        await expect(fallos).toHaveCSS('color', 'rgb(255, 43, 78)');
+
+        // Los colores se comprueban contra las variables del CSS (--verde y
+        // --rojo): así el test sigue siendo válido aunque cambie la paleta.
+        const colores = await page.evaluate(() => {
+            function aRgb(color) {
+                color = String(color).trim();
+                if (color.startsWith('#')) {
+                    let hexadecimal = color.slice(1);
+                    if (hexadecimal.length === 3) {
+                        hexadecimal = hexadecimal.split('').map(function (c) {
+                            return c + c;
+                        }).join('');
+                    }
+                    const numero = parseInt(hexadecimal, 16);
+                    return 'rgb(' + ((numero >> 16) & 255) + ', '
+                        + ((numero >> 8) & 255) + ', ' + (numero & 255) + ')';
+                }
+                return color;
+            }
+
+            const estilos = getComputedStyle(document.documentElement);
+            const elementoAciertos = document.querySelector('#lista-partidas .partida-aciertos');
+            const elementoFallos = document.querySelector('#lista-partidas .partida-fallos');
+
+            return {
+                aciertos: getComputedStyle(elementoAciertos).color,
+                fallos: getComputedStyle(elementoFallos).color,
+                // El color de acierto y de fallo puede ser el color de marca
+                // o su variante clara (la que cumple el contraste AA)
+                verdes: [
+                    aRgb(estilos.getPropertyValue('--verde')),
+                    aRgb(estilos.getPropertyValue('--verde-texto'))
+                ],
+                rojos: [
+                    aRgb(estilos.getPropertyValue('--rojo')),
+                    aRgb(estilos.getPropertyValue('--rojo-texto'))
+                ]
+            };
+        });
+
+        expect(colores.verdes).toContain(colores.aciertos);
+        expect(colores.rojos).toContain(colores.fallos);
+        expect(colores.aciertos).not.toBe(colores.fallos);
     });
 
     test('sin partidas registradas se muestra un mensaje y la app sigue siendo utilizable', async ({ page }) => {

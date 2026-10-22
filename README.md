@@ -1,11 +1,12 @@
 # OPOQUIZ
 
 ![Pruebas](https://github.com/franmaurizpereira/OPOQUIZT/actions/workflows/tests.yml/badge.svg)
-![Licencia](https://img.shields.io/badge/estilo-retro%2080s-00e5ff)
+![Licencia](https://img.shields.io/badge/estilo-Fallout%2050s-f2a900)
 
 Aplicación web que crea una **base de datos vectorial** a partir de PDF de
 Administración Pública y genera un **quiz de 30 preguntas** que se sirve en el
-navegador con la librería `quizlib.min.js` y estética retro de los años 80.
+navegador con la librería `quizlib.min.js` y estética retro-futurista de los
+años 50 (Fallout).
 
 > ⚠️ **Los PDF de origen no están en el repositorio** (son material local de
 > estudio). Colócalos en `pdfs/` para poder reingerir o regenerar el banco de
@@ -248,7 +249,8 @@ El trabajo se apoya en `specs/NNN-nombre/`, con `spec.md` (qué y por qué),
 
 ```
 ├── index.html                 ← punto de entrada del quiz
-├── css/style.css              ← estilos retro (años 80)
+├── css/style.css              ← estilos retro-futuristas (años 50, Fallout)
+├── css/fuentes/               ← tipografías locales (OFL) para jugar sin red
 ├── js/
 │   ├── quizlib.min.js         ← librería de quiz (Quiz.Classes, checkAnswers)
 │   ├── quiz.js                ← datos de las 30 preguntas de respaldo (quizData)

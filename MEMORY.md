@@ -6,7 +6,8 @@
 ## Estado actual (v1 + historial + partidas variables + pool + revisión)
 - Flujo completo: 9 PDF → extracción → troceado → embeddings → **2555 chunks**
   (2090 texto / 465 tabla) en PostgreSQL 18 + pgvector 0.8.0 → **30 preguntas**
-  en `js/quiz.js` → frontend retro 80s → `npx playwright test` **35 tests** (19
+  en `js/quiz.js` → frontend retro-futurismo años 50 (Fallout) →
+  `npx playwright test` **35 tests** (19
   del quiz + 7 del pool + 9 de la revisión) y `backend/test_pool.py` **35/35 ✅**.
 - Modelos Ollama: `locusai/all-minilm-l6-v2:latest` (embeddings, 384 dims) y
   `qwen3.8:27b` (preguntas: ~60 s por lote de 3 → ~20 min el total).
@@ -23,9 +24,12 @@
 - **Una pregunta sin contestar NO muestra ningún color** (ni verde ni rojo) ni
   explicación: no se puede adelantar la respuesta correcta. Solo las preguntas
   ya respondidas llevan marcado (checklist de `reviewer.md`).
-- Comentarios y textos de UI **en español**; estética **retro 80s** (fondo
-  oscuro, neones lima/cian/magenta/amarillo, monoespaciada, bordes pixelados).
-- Sin frameworks, CDN ni Google Fonts: el quiz funciona sin red.
+- Comentarios y textos de UI **en español**; estética **retro-futurismo de
+  los años 50 (Fallout)**: fondo marrón carbón, azul Vault Boy, naranja de
+  menús, verde y rojo de terminal, tipografías locales (Anton, Oswald,
+  Courier Prime, VT323). El neón de los 80 (spec 003) ya no manda.
+- Sin frameworks, CDN ni fuentes remotas: el quiz funciona sin red. Las
+  fuentes viven en `css/fuentes/` con su licencia OFL.
 - La web se sirve **solo** con `backend/server.py`: publica `index.html`,
   `css/` y `js/`, nunca el resto del proyecto.
 
@@ -48,9 +52,9 @@
   anteriores desde el inicio; solo las **20 más recientes** conservan el
   detalle (de las anteriores se poda, pero no se pierden).
 - **La opción elegida se guarda al contestar**, no al terminar: en el evento
-  `change` se apuntan `elegidas[i]` y `acertadas[i]`, y el detalle se arma
-  al final. Así no hay que leer el DOM (que puede haber cambiado) para saber
-  qué se eligió.
+  `change` se apunta `elegidas[i]` y el detalle se arma al final (el acierto
+  se recalcula comparando con `correcta`). Así no hay que leer el DOM (que
+  puede haber cambiado) para saber qué se eligió.
 - **En la revisión, una pregunta sin contestar sale SIN color y SIN
   explicación**: manda la regla global de no adelantar la respuesta correcta.
   Las opciones llevan `data-correcta` y `data-elegida` para poder comprobarlas
@@ -94,12 +98,26 @@
   y el de las opciones (recalculando `correcta` y renumerando A/B/C/D) sobre
   una copia de `quizData`, que no se modifica. En el banco no puede haber dos
   preguntas con las mismas opciones: `deduplicar()` y `backend/reparar_quiz.py`
-  lo comprueban por opciones, por enunciado y por texto de respuesta correcta.- **Skill `frontend-design` adaptada a OPOQUIZ** (en español, retro 80s), sin
+  lo comprueban por opciones, por enunciado y por texto de respuesta correcta.
+- **Skill `frontend-design` adaptada a OPOQUIZ** (en español, Fallout 50s), sin
   `skills-lock.json` para que `npx skills update` no la pise (original en
   `UPSTREAM.md`).
-- **Dirección de arte "terminal de cristal 1987"**: bisel de cabina, viñeta de
-  tubo, barra de espectro, casillas de radio a píxeles, progreso de 30 celdas
-  con cursor, `prefers-reduced-motion` respetado.
+- **Dirección de arte "vault de los años 50"** (spec 005): el neón CRT de
+  los 80 se sustituyó por cartón marrón, azul Vault Boy y naranja de menú.
+  Motivo: pedido explícito del usuario (2026-10-22).
+- **Fuentes locales, no Google Fonts**: `css/fuentes/*.woff2` (Anton, Oswald,
+  VT323, Courier Prime; OFL). El juego debe seguir funcionando sin red, y un
+  `@import` remoto bloquearía el primer pintado sin conexión.
+- **El color de estado del texto va en su variante clara** (`--verde-texto`,
+  `--rojo-texto`): el rojo de marca `#d0433a` sobre el panel no llegaba a AA.
+  Los tests leen `--verde`/`--rojo` y aceptan cualquiera de las dos variantes.
+- **Del diseño anterior se conservan las buenas ideas**: viñeta, grano de
+  película, casillas de radio dibujadas (no nativas), progreso de 30 celdas
+  con cursor y `prefers-reduced-motion` respetado. Se eliminó el parpadeo
+  del título (los parpadeos no encajan con la estética Fallout).
+- **Los cambios de estilo tienen su propio flujo** (spec 005): el Graphic
+  Designer solo toca `css/style.css` y el Reviewer de estilo lo valida con
+  5 gates. `AGENTS.md` §2, §3, §5 y §7 quedan actualizados con esa rama.
 
 ## Errores a evitar
 - **`pkill -f "genera..."` mata al propio shell**: el patrón coincide con la
