@@ -17,20 +17,27 @@ años 50 (Fallout).
 
 **Pantalla de inicio** con el historial de las últimas partidas:
 
-![Pantalla de inicio](docs/img/inicio.png)
+![Pantalla de inicio](docs/capturas/inicio.jpg)
 
 **Pregunta contestada**: la opción correcta en verde, la fallada en rojo y la
 explicación del por qué:
 
-![Pregunta contestada](docs/img/pregunta.png)
+![Pregunta acertada](docs/capturas/quiz-acierto.jpg)
 
-**Pantalla final** con la puntuación y el reinicio:
+![Pregunta fallada](docs/capturas/quiz-fallo.jpg)
 
-![Pantalla final](docs/img/final.png)
+**Pantalla final** con la puntuación, la revisión y el reinicio:
 
-**Vista móvil** (380 px):
+![Pantalla final](docs/capturas/final.jpg)
 
-![Vista móvil](docs/img/movil.png)
+**Revisión de la partida**: las 30 preguntas con la correcta, la elegida y la
+explicación, filtrables por acierto, fallo o sin contestar:
+
+![Revisión de la partida](docs/capturas/revision.jpg)
+
+**Vista móvil** (390 px):
+
+![Vista móvil](docs/capturas/movil-quiz.jpg)
 
 ## Flujo
 
@@ -281,7 +288,7 @@ El trabajo se apoya en `specs/NNN-nombre/`, con `spec.md` (qué y por qué),
 ├── .pi/settings.json          ← registra los agentes como comandos de Pi
 ├── .agents/skills/            ← skills del proyecto (frontend-design)
 ├── specs/                     ← specs del flujo SDD (spec.md, plan.md, tasks.md)
-├── docs/img/                  ← capturas de la aplicación para el README
+├── docs/capturas/             ← capturas de la aplicación para el README
 ├── .github/workflows/         ← integración continua (pruebas con Playwright)
 ├── pdfs/                      ← PDF de origen (local, no versionado)
 ├── credencial.example.yaml    ← plantilla de credenciales (la real se ignora)

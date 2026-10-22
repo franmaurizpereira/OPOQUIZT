@@ -332,11 +332,9 @@ body::after {
     padding-left: 16px;
 }
 
+/* El texto del HTML ya empieza por ">": no se añade otro marcador */
 .caracteristicas li::before {
-    content: "▸";
-    position: absolute;
-    left: 0;
-    color: var(--naranja);
+    content: none;
 }
 
 /* ------------------------------------------------------------- botones */
