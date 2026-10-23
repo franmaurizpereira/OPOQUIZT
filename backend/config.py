@@ -40,6 +40,16 @@ MODELO_LLM_OPENROUTER = os.environ.get(
     "OPENROUTER_MODEL", "deepseek/deepseek-v4-flash"
 )
 URL_OPENROUTER = "https://openrouter.ai/api/v1/chat/completions"
+
+# Proveedor remoto genérico compatible con OpenAI. Con OPOQUIZ_API_BASE y
+# OPOQUIZ_API_KEY se puede usar cualquier servicio (DeepSeek directo,
+# OpenRouter, etc.) sin tocar código. `USAR_JSON_SCHEMA` se pone a 0 para
+# los proveedores que solo aceptan `json_object` (DeepSeek).
+URL_API_REMOTA = os.environ.get("OPOQUIZ_API_BASE", URL_OPENROUTER)
+CLAVE_API_REMOTA = os.environ.get("OPOQUIZ_API_KEY", OPENROUTER_API_KEY)
+MODELO_REMOTO = os.environ.get("OPOQUIZ_MODELO_REMOTO", MODELO_LLM_OPENROUTER)
+USAR_JSON_SCHEMA = os.environ.get("OPOQUIZ_JSON_SCHEMA", "1") != "0"
+
 # Identificación de la aplicación en OpenRouter (opcional pero recomendable)
 OPENROUTER_TITULO = "OPOQUIZ"
 

@@ -295,23 +295,23 @@ class TestEnunciadosSinReferencias(unittest.TestCase):
 class TestModeloDeExplicaciones(unittest.TestCase):
     """Sin clave remota la reescritura debe usar el modelo local."""
 
-    def test_con_openrouter_usa_el_remoto(self):
-        original_clave, original_remoto = config.OPENROUTER_API_KEY, config.MODELO_LLM_OPENROUTER
+    def test_con_proveedor_remoto_usa_el_remoto(self):
+        original_clave, original_remoto = config.CLAVE_API_REMOTA, config.MODELO_REMOTO
         try:
-            config.OPENROUTER_API_KEY = "clave-de-prueba"
-            config.MODELO_LLM_OPENROUTER = "remoto/modelo"
+            config.CLAVE_API_REMOTA = "clave-de-prueba"
+            config.MODELO_REMOTO = "remoto/modelo"
             self.assertEqual(g.modelo_para_explicaciones(), "remoto/modelo")
         finally:
-            config.OPENROUTER_API_KEY, config.MODELO_LLM_OPENROUTER = original_clave, original_remoto
+            config.CLAVE_API_REMOTA, config.MODELO_REMOTO = original_clave, original_remoto
 
-    def test_sin_openrouter_usa_el_local(self):
-        original_clave, original_local = config.OPENROUTER_API_KEY, config.MODELO_LLM
+    def test_sin_proveedor_remoto_usa_el_local(self):
+        original_clave, original_local = config.CLAVE_API_REMOTA, config.MODELO_LLM
         try:
-            config.OPENROUTER_API_KEY = ""
+            config.CLAVE_API_REMOTA = ""
             config.MODELO_LLM = "local/modelo"
             self.assertEqual(g.modelo_para_explicaciones(), "local/modelo")
         finally:
-            config.OPENROUTER_API_KEY, config.MODELO_LLM = original_clave, original_local
+            config.CLAVE_API_REMOTA, config.MODELO_LLM = original_clave, original_local
 
 
 class TestReescrituraEnParalelo(unittest.TestCase):

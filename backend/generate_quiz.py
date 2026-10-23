@@ -57,7 +57,9 @@ SOLAPAMIENTO_MINIMO = 0.20   # parecido mínimo entre enunciado y texto
 SOLAPAMIENTO_OPCION = 0.35   # parecido mínimo entre la opción correcta y el texto
 PENSAMIENTO = False         # desactivar el razonamiento del modelo: multiplica la velocidad
 CONTEXTO_POOL = 8192        # ventana de contexto para las llamadas del pool
-MAX_TOKENS_RESPUESTA = int(os.environ.get("OPOQUIZ_MAX_TOKENS", "4096"))
+# Los modelos con razonamiento (DeepSeek V4) gastan tokens pensando antes
+# de escribir: con 4.096 se quedaban sin presupuesto y devolvían vacío.
+MAX_TOKENS_RESPUESTA = int(os.environ.get("OPOQUIZ_MAX_TOKENS", "8192"))
 SEMILLA = 20240517           # semilla para que el barajado sea reproducible
 FICHERO_CACHE = config.RAIZ / "logs" / "preguntas_cache.json"  # progreso intermedio
 CHECKPOINT_CADA = 25        # guarda el pool cada N preguntas generadas
@@ -368,7 +370,7 @@ def _llamar_openrouter(prompt, esquema=None):
     creciente entre intentos.
     """
     cuerpo = {
-        "model": config.MODELO_LLM_OPENROUTER,
+        "model": config.MODELO_REMOTO,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.35,
         "top_p": 0.9,
@@ -379,27 +381,32 @@ def _llamar_openrouter(prompt, esquema=None):
         "max_tokens": MAX_TOKENS_RESPUESTA,
     }
 
-    # Se pide la respuesta en JSON con el esquema de las preguntas
+    # Se pide la respuesta en JSON con el esquema de las preguntas. Algunos
+    # proveedores (DeepSeek) solo aceptan `json_object`: el prompt ya
+    # describe la estructura y `_extraer_json` se encarga de leerla.
     if esquema:
-        cuerpo["response_format"] = {
-            "type": "json_schema",
-            "json_schema": {
-                "name": "preguntas",
-                "strict": True,
-                "schema": esquema,
-            },
-        }
+        if config.USAR_JSON_SCHEMA:
+            cuerpo["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "preguntas",
+                    "strict": True,
+                    "schema": esquema,
+                },
+            }
+        else:
+            cuerpo["response_format"] = {"type": "json_object"}
 
     datos_peticion = json.dumps(cuerpo).encode("utf-8")
     ultimo_error = None
 
     for intento in range(MAX_INTENTOS_RED):
         peticion = urllib.request.Request(
-            config.URL_OPENROUTER,
+            config.URL_API_REMOTA,
             data=datos_peticion,
             headers={
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {config.OPENROUTER_API_KEY}",
+                "Authorization": f"Bearer {config.CLAVE_API_REMOTA}",
                 "HTTP-Referer": "https://github.com/opoquiz",
                 "X-Title": config.OPENROUTER_TITULO,
                 "Accept": "text/event-stream",
@@ -452,7 +459,7 @@ def _llamar_llm(prompt, modelo=config.MODELO_LLM, formato="json", num_ctx=8192):
     Si hay clave de OpenRouter configurada se usa el modelo remoto (más
     rápido); si no, se usa el modelo local de Ollama.
     """
-    if config.OPENROUTER_API_KEY:
+    if config.CLAVE_API_REMOTA:
         esquema = formato if isinstance(formato, dict) else None
         return _llamar_openrouter(prompt, esquema)
 
@@ -743,7 +750,7 @@ def generar_preguntas_pool(
         objetivos[i : i + tamanho_lote] for i in range(0, len(objetivos), tamanho_lote)
     ]
 
-    if not config.OPENROUTER_API_KEY:
+    if not config.CLAVE_API_REMOTA:
         workers = 1
     else:
         workers = max(1, workers)
@@ -1315,8 +1322,8 @@ def modelo_para_explicaciones():
     Antes se pasaba siempre el nombre del remoto, así que sin clave Ollama
     recibía un modelo que no existe.
     """
-    if config.OPENROUTER_API_KEY:
-        return config.MODELO_LLM_OPENROUTER
+    if config.CLAVE_API_REMOTA:
+        return config.MODELO_REMOTO
     return config.MODELO_LLM
 
 
