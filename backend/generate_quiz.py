@@ -45,6 +45,10 @@ LOTE_PREGUNTAS = 3          # preguntas que se piden al LLM en una sola llamada
 MAX_INTENTOS = 2            # intentos por lote hasta conseguir preguntas válidas
 MAX_INTENTOS_POOL = 3       # intentos por fragmento en el modo pool
 LOTE_PREGUNTAS_POOL = int(os.environ.get("OPOQUIZ_LOTE", "4"))
+# Preguntas que se piden por fragmento. Con 1 no se llega a 2.100 (el
+# modelo local descarta ~40 %); con 2 se aprovecha el mismo contexto largo
+# para dos preguntas distintas.
+PREGUNTAS_POR_FRAGMENTO = max(1, int(os.environ.get("OPOQUIZ_POR_FRAGMENTO", "1")))
 WORKERS_POOL = int(os.environ.get("OPOQUIZ_WORKERS", "8"))
 MAX_INTENTOS_RED = 4         # reintentos cuando la API remota falla o expira
 TIEMPO_MAX_LLM = 120         # segundos máximos de espera por respuesta
@@ -75,6 +79,32 @@ VACIAS = {
 
 # ---------------------------------------------------------------- utilidades
 
+
+# Enunciados que empiezan citando el material de origen («Según la letra i)
+# del contexto, …»): delatan de dónde sale la pregunta y no se entienden
+# solos. Se quita esa primera cláusula; si el enunciado no se puede limpiar,
+# se descarta.
+PATRON_ENUNCIADO_REFERENCIA = re.compile(
+    r"^\s*(?:seg[uú]n|conforme a|de acuerdo con|en virtud de)\b"
+    r"[^,;:]{0,60}?\b(?:el texto|el contexto|el fragmento|la letra)\b"
+    r"[^,;:]{0,60}[,;:]\s*",
+    re.IGNORECASE,
+)
+
+
+def _limpiar_enunciado(enunciado):
+    """Quita la cláusula inicial que cita el texto de origen.
+
+    «Según la letra i) del contexto, ¿qué medida…?» pasa a «¿qué medida…?».
+    Si la cláusula menciona una norma concreta («Según el artículo 14, …»)
+    no se toca: ese dato ancla la pregunta y es legítimo.
+    """
+    limpio = str(enunciado).strip()
+    while True:
+        nuevo = PATRON_ENUNCIADO_REFERENCIA.sub("", limpio, count=1).strip()
+        if nuevo == limpio:
+            return limpio
+        limpio = nuevo
 
 PATRON_PREFIJO_OPCION = re.compile(r"^\s*[a-dA-D][)\-.\:]\s*")
 
@@ -453,8 +483,13 @@ def _llamar_llm(prompt, modelo=config.MODELO_LLM, formato="json", num_ctx=8192):
     return datos["message"]["content"]
 
 
-def construir_prompt(contextos):
-    """Construye el prompt para un lote de contextos."""
+def construir_prompt(contextos, por_contexto=PREGUNTAS_POR_FRAGMENTO):
+    """Construye el prompt para un lote de contextos.
+
+    `por_contexto` permite pedir más de una pregunta por fragmento. Se usa
+    con los fragmentos largos: dos preguntas sobre artículos distintos del
+    mismo texto cubren más materia sin necesitar más material.
+    """
     bloques = []
     for i, ctx in enumerate(contextos, start=1):
         bloques.append(
@@ -463,11 +498,18 @@ def construir_prompt(contextos):
         )
     texto_contextos = "\n\n".join(bloques)
 
+    total = len(contextos) * por_contexto
+    reparto = (
+        "UNA por cada contexto"
+        if por_contexto == 1
+        else f"{por_contexto} por cada contexto, sobre datos distintos del mismo texto"
+    )
+
     return f"""Eres un experto en derecho administrativo y constitucional español
 y en la preparación de oposiciones de la Administración Pública.
 
-A partir de los CONTEXTOS siguientes, redacta {len(contextos)} preguntas tipo
-test de opción múltiple, UNA por cada contexto.
+A partir de los CONTEXTOS siguientes, redacta {total} preguntas tipo
+test de opción múltiple, {reparto}.
 
 {texto_contextos}
 
@@ -479,6 +521,8 @@ REGLAS ESTRICTAS:
   similar a la correcta, pero contradicen el texto.
 - La explicación debe indicar por qué la respuesta correcta es la correcta,
   basándose en el dato concreto del texto.
+- Si hay varias preguntas del mismo contexto, usa el mismo número en
+  "contexto" y no repitas la misma idea ni el mismo dato.
 - Escribe todo en español, con lenguaje claro y sin errores ortográficos.
 - No uses expresiones como "según el texto" en el enunciado.
 - El enunciado debe mencionar términos concretos que aparecen literalmente en
@@ -895,7 +939,7 @@ def validar_pregunta(item, contexto, con_motivo=False):
     Devuelve la pregunta normalizada o None si no es válida. Si se pide
     `con_motivo`, devuelve en su lugar el motivo del descarte.
     """
-    enunciado = (item.get("pregunta") or "").strip()
+    enunciado = _limpiar_enunciado(item.get("pregunta") or "")
     opciones = item.get("opciones") or []
     correcta = item.get("correcta")
     explicacion = (item.get("explicacion") or "").strip()
@@ -917,6 +961,10 @@ def validar_pregunta(item, contexto, con_motivo=False):
         return motivo("el índice de la correcta no es válido")
     if len(explicacion) < 30:
         return motivo("explicación demasiado corta")
+
+    # Si tras limpiar sigue citando el material de origen, no vale
+    if PATRON_ENUNCIADO_REFERENCIA.search(enunciado):
+        return motivo("el enunciado referencia el texto de origen")
 
     # --- idioma: se descartan las preguntas con palabras inglesas ---
     inglesas = {
@@ -1225,7 +1273,7 @@ def main_mejorar_explicaciones():
 
     def reescribir(pregunta):
         return mejorar_explicacion(
-            config.MODELO_LLM_OPENROUTER,
+            modelo_para_explicaciones(),
             pregunta["pregunta"],
             pregunta["opciones"],
             pregunta.get("correcta", 0),
@@ -1254,6 +1302,18 @@ PATRON_REFERENCIAS = re.compile(
     r"(?!\s+(refundido|consolidado))",
     re.IGNORECASE,
 )
+
+
+def modelo_para_explicaciones():
+    """Devuelve el modelo que debe reescribir las explicaciones.
+
+    Con clave de OpenRouter se usa el remoto; sin ella, el local de Ollama.
+    Antes se pasaba siempre el nombre del remoto, así que sin clave Ollama
+    recibía un modelo que no existe.
+    """
+    if config.OPENROUTER_API_KEY:
+        return config.MODELO_LLM_OPENROUTER
+    return config.MODELO_LLM
 
 
 def reescribir_en_paralelo(

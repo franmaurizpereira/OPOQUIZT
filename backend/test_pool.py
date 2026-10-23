@@ -239,6 +239,81 @@ class TestSeleccionChunksParaPool(unittest.TestCase):
         self.assertEqual(g.seleccionar_chunks_para_pool([], 100), [])
 
 
+class TestEnunciadosSinReferencias(unittest.TestCase):
+    """Un enunciado no puede hablar del contexto del que sale."""
+
+    def _contexto(self):
+        return {
+            "id": 1,
+            "ruta_pdf": "/pdfs/doc.pdf",
+            "pagina": 1,
+            "contenido": (
+                "El artículo 14 de la Constitución Española reconoce la igualdad "
+                "ante la ley sin discriminación por razón de nacimiento, raza, "
+                "sexo, religión u opinión."
+            ),
+        }
+
+    def _pregunta(self, enunciado):
+        return {
+            "pregunta": enunciado,
+            "opciones": [
+                "La igualdad ante la ley sin discriminación por nacimiento",
+                "La libertad de circulación por todo el territorio nacional",
+                "El derecho a la tutela judicial efectiva de los ciudadanos",
+                "La obligación de contribuir al sostenimiento del Estado",
+            ],
+            "correcta": 0,
+            "explicacion": "El artículo 14 reconoce la igualdad ante la ley sin discriminación.",
+        }
+
+    def test_limpia_la_clausula_que_cita_el_contexto(self):
+        for enunciado, esperado in (
+            ("Según la letra i) del contexto, ¿qué reconoce el artículo?",
+             "¿qué reconoce el artículo?"),
+            ("Conforme a lo indicado en el texto, ¿qué derecho se reconoce?",
+             "¿qué derecho se reconoce?"),
+            ("De acuerdo con el fragmento, ¿qué principio se garantiza?",
+             "¿qué principio se garantiza?"),
+        ):
+            self.assertEqual(g._limpiar_enunciado(enunciado), esperado)
+
+    def test_no_toca_una_clausula_con_la_norma(self):
+        enunciado = "Según el artículo 14, ¿qué reconoce la Constitución?"
+        self.assertEqual(g._limpiar_enunciado(enunciado), enunciado)
+
+    def test_acepta_un_enunciado_normal(self):
+        valida = g.validar_pregunta(
+            self._pregunta(
+                "¿Qué reconoce el artículo 14 de la Constitución Española?"
+            ),
+            self._contexto(),
+        )
+        self.assertIsNotNone(valida)
+
+
+class TestModeloDeExplicaciones(unittest.TestCase):
+    """Sin clave remota la reescritura debe usar el modelo local."""
+
+    def test_con_openrouter_usa_el_remoto(self):
+        original_clave, original_remoto = config.OPENROUTER_API_KEY, config.MODELO_LLM_OPENROUTER
+        try:
+            config.OPENROUTER_API_KEY = "clave-de-prueba"
+            config.MODELO_LLM_OPENROUTER = "remoto/modelo"
+            self.assertEqual(g.modelo_para_explicaciones(), "remoto/modelo")
+        finally:
+            config.OPENROUTER_API_KEY, config.MODELO_LLM_OPENROUTER = original_clave, original_remoto
+
+    def test_sin_openrouter_usa_el_local(self):
+        original_clave, original_local = config.OPENROUTER_API_KEY, config.MODELO_LLM
+        try:
+            config.OPENROUTER_API_KEY = ""
+            config.MODELO_LLM = "local/modelo"
+            self.assertEqual(g.modelo_para_explicaciones(), "local/modelo")
+        finally:
+            config.OPENROUTER_API_KEY, config.MODELO_LLM = original_clave, original_local
+
+
 class TestReescrituraEnParalelo(unittest.TestCase):
     """Las explicaciones se reescriben en paralelo y se guarda el progreso."""
 

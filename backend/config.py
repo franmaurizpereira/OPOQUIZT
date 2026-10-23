@@ -23,7 +23,9 @@ RUTA_CACHE_POOL = RAIZ / "logs" / "pool_cache.json"
 
 # Modelos de Ollama usados en local
 MODELO_EMBEDDINGS = "locusai/all-minilm-l6-v2:latest"
-MODELO_LLM = "qwen3.8:27b"
+# El modelo local se puede cambiar sin tocar código (p. ej. qwen3:8b, que
+# con GPU va mucho más rápido que el 27B para generar el pool).
+MODELO_LLM = os.environ.get("OPOQUIZ_MODELO_LOCAL", "qwen3.8:27b")
 URL_OLLAMA = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 
 # OpenRouter (opcional): si hay clave, el generador de preguntas usa el
