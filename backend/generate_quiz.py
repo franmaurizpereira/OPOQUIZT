@@ -19,12 +19,19 @@ Uso:
 
 import argparse
 import json
+import os
 import random
 import re
 import sys
 import time
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from collections import deque
+from concurrent.futures import (
+    FIRST_COMPLETED,
+    ThreadPoolExecutor,
+    as_completed,
+    wait,
+)
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -37,8 +44,8 @@ TOTAL_PREGUNTAS = 30
 LOTE_PREGUNTAS = 3          # preguntas que se piden al LLM en una sola llamada
 MAX_INTENTOS = 2            # intentos por lote hasta conseguir preguntas válidas
 MAX_INTENTOS_POOL = 3       # intentos por fragmento en el modo pool
-LOTE_PREGUNTAS_POOL = 4     # preguntas por llamada al modelo en el modo pool
-WORKERS_POOL = 8             # lotes en paralelo (solo con modelo remoto)
+LOTE_PREGUNTAS_POOL = int(os.environ.get("OPOQUIZ_LOTE", "4"))
+WORKERS_POOL = int(os.environ.get("OPOQUIZ_WORKERS", "8"))
 MAX_INTENTOS_RED = 4         # reintentos cuando la API remota falla o expira
 TIEMPO_MAX_LLM = 120         # segundos máximos de espera por respuesta
 ESPERA_ENTRE_INTENTOS = 15   # segundos de espera antes de reintentar
@@ -46,7 +53,7 @@ SOLAPAMIENTO_MINIMO = 0.20   # parecido mínimo entre enunciado y texto
 SOLAPAMIENTO_OPCION = 0.35   # parecido mínimo entre la opción correcta y el texto
 PENSAMIENTO = False         # desactivar el razonamiento del modelo: multiplica la velocidad
 CONTEXTO_POOL = 8192        # ventana de contexto para las llamadas del pool
-MAX_TOKENS_RESPUESTA = 4096 # tope de respuesta (evita el 402 de OpenRouter)
+MAX_TOKENS_RESPUESTA = int(os.environ.get("OPOQUIZ_MAX_TOKENS", "4096"))
 SEMILLA = 20240517           # semilla para que el barajado sea reproducible
 FICHERO_CACHE = config.RAIZ / "logs" / "preguntas_cache.json"  # progreso intermedio
 CHECKPOINT_CADA = 25        # guarda el pool cada N preguntas generadas
@@ -67,6 +74,23 @@ VACIAS = {
 }
 
 # ---------------------------------------------------------------- utilidades
+
+
+PATRON_PREFIJO_OPCION = re.compile(r"^\s*[a-dA-D][)\-.\:]\s*")
+
+
+def _sin_prefijo_opcion(texto):
+    """Quita los prefijos «A)», «b.»… que algunos modelos meten en la opción.
+
+    El juego numera las opciones al pintarlas, así que si el texto llega con
+    su propia letra se vería «A) A) …». Se quitan todas las capas.
+    """
+    limpio = str(texto).strip()
+    while True:
+        nuevo = PATRON_PREFIJO_OPCION.sub("", limpio, count=1).strip()
+        if nuevo == limpio:
+            return limpio
+        limpio = nuevo
 
 
 def _limpiar_texto(texto):
@@ -683,73 +707,63 @@ def generar_preguntas_pool(
     generadas = 0
     guardadas = len(pool)
 
-    # Los lotes se procesan en tandas: en cada tanda se piden `workers`
-    # lotes a la vez y se espera a que terminen todos.
-    indice_lote = 0
-    while indice_lote < len(lotes) and len(pool) < objetivo:
-        tanda = lotes[indice_lote : indice_lote + workers]
-        indice_lote += len(tanda)
+    # Los lotes se piden en ventana deslizante: siempre hay `workers`
+    # peticiones en vuelo y, en cuanto una termina, se procesa y se lanza la
+    # siguiente. Antes se esperaba a la tanda entera y un lote lento (o un
+    # reintento) bloqueaba a los demás.
+    pendientes = deque(lotes)
+    en_curso = {}
+    lanzados = 0
+    procesados = 0
 
-        if workers == 1:
-            resultados = [
-                _generar_lote(tanda[0], modelo, indice_lote) if tanda else []
-            ]
-        else:
-            # Cada lote tiene su propio tiempo máximo: si uno se queda
-            # colgado, no se bloquea la tanda entera
-            with ThreadPoolExecutor(max_workers=workers) as ejecutor:
-                futuros = {
-                    ejecutor.submit(_generar_lote, lote, modelo, numero): numero
-                    for numero, lote in enumerate(
-                        tanda, start=indice_lote - len(tanda) + 1
-                    )
-                }
-                resultados = []
+    with ThreadPoolExecutor(max_workers=workers) as ejecutor:
+        while (pendientes or en_curso) and len(pool) < objetivo:
+            while pendientes and len(en_curso) < workers:
+                lote = pendientes.popleft()
+                lanzados += 1
+                futuro = ejecutor.submit(_generar_lote, lote, modelo, lanzados)
+                en_curso[futuro] = lanzados
+
+            if not en_curso:
+                break
+
+            hechos, _ = wait(en_curso, return_when=FIRST_COMPLETED)
+
+            for futuro in hechos:
+                numero = en_curso.pop(futuro)
                 try:
-                    for futuro in as_completed(futuros, timeout=TIEMPO_MAX_LLM * 2):
-                        resultados.append(futuro.result())
-                except TimeoutError:
-                    print(
-                        "  Se abandona la tanda: algún lote no ha respondido a tiempo",
-                        flush=True,
-                    )
-                for futuro, numero in futuros.items():
-                    if futuro.done():
+                    validas = futuro.result()
+                except Exception as exc:  # noqa: BLE001 - un lote no corta el pool
+                    print(f"  Lote {numero}: se descarta ({exc})", flush=True)
+                    validas = []
+
+                nuevas = []
+                for pregunta in validas:
+                    if _son_duplicadas_con_pool(pregunta, pool + nuevas):
+                        print("    pregunta descartada por estar repetida", flush=True)
                         continue
-                    futuro.cancel()
+                    nuevas.append(pregunta)
+
+                pool.extend(nuevas)
+                generadas += len(nuevas)
+                procesados += 1
+
+                print(
+                    f"  [lote {procesados}/{len(lotes)}] {len(pool)}/{objetivo} preguntas",
+                    flush=True,
+                )
+
+                # Guardado periódico: si se corta la ejecución, no se pierde
+                # el trabajo. Además se publica el pool a medias, para que se
+                # pueda jugar mientras la generación sigue.
+                if len(pool) - guardadas >= CHECKPOINT_CADA:
+                    guardar_cache(pool, ruta_cache)
+                    guardadas = len(pool)
+                    publicar(pool, ruta_cache)
                     print(
-                        f"  Lote {numero}: se abandona por exceso de tiempo",
+                        f"  [checkpoint] {len(pool)} preguntas guardadas en la caché",
                         flush=True,
                     )
-
-        for validas in resultados:
-            # Se descartan las que ya había en el pool
-            nuevas = []
-            for pregunta in validas:
-                if _son_duplicadas_con_pool(pregunta, pool + nuevas):
-                    print("    pregunta descartada por estar repetida", flush=True)
-                    continue
-                nuevas.append(pregunta)
-
-            pool.extend(nuevas)
-            generadas += len(nuevas)
-
-        print(
-            f"  [tanda {indice_lote // workers}] {len(pool)}/{objetivo} preguntas",
-            flush=True,
-        )
-
-        # Guardado periódico: si se corta la ejecución, no se pierde el trabajo.
-        # Además se publica el pool a medias, para que se pueda jugar mientras
-        # la generación sigue.
-        if len(pool) - guardadas >= CHECKPOINT_CADA:
-            guardar_cache(pool, ruta_cache)
-            guardadas = len(pool)
-            publicar(pool, ruta_cache)
-            print(
-                f"  [checkpoint] {len(pool)} preguntas guardadas en la caché",
-                flush=True,
-            )
 
     return pool[:objetivo]
 
@@ -894,7 +908,7 @@ def validar_pregunta(item, contexto, con_motivo=False):
         return motivo("enunciado demasiado corto")
     if not isinstance(opciones, list) or len(opciones) != 4:
         return motivo("no tiene exactamente 4 opciones")
-    opciones = [str(o).strip() for o in opciones]
+    opciones = [_sin_prefijo_opcion(o) for o in opciones]
     if any(len(o) < 1 for o in opciones):
         return motivo("tiene una opción vacía")
     if len(set(o.lower() for o in opciones)) != 4:
@@ -1098,6 +1112,10 @@ def escribir_pool_json(preguntas, ruta=config.QUIZ_POOL_PATH):
     limpio = []
     for p in preguntas:
         barajada = _barajar_opciones(p, azar)
+        # Red de seguridad: ninguna opción publicada lleva su propia letra
+        barajada["opciones"] = [
+            _sin_prefijo_opcion(opcion) for opcion in barajada["opciones"]
+        ]
         # El tema viaja con la pregunta para que el navegador pueda repartir
         # la partida por temarios. Si la pregunta ya lo trae se respeta; si
         # no, se deduce de la fuente; y si tampoco hay fuente, "General".
@@ -1205,12 +1223,8 @@ def main_mejorar_explicaciones():
     ya_hechas = _cargar_lista(ruta_cache)
     indices_hechos = {p.get("indice") for p in ya_hechas}
 
-    reescritas = 0
-    for indice, pregunta in enumerate(pendientes):
-        if indice in indices_hechos:
-            continue
-
-        nueva = mejorar_explicacion(
+    def reescribir(pregunta):
+        return mejorar_explicacion(
             config.MODELO_LLM_OPENROUTER,
             pregunta["pregunta"],
             pregunta["opciones"],
@@ -1218,19 +1232,9 @@ def main_mejorar_explicaciones():
             pregunta["explicacion"],
         )
 
-        if nueva:
-            reescritas += 1
-            ya_hechas.append({"indice": indice, "explicacion": nueva})
-
-        if (indice + 1) % 10 == 0:
-            _guardar_lista(ya_hechas, ruta_cache)
-            print(
-                f"  [checkpoint] {indice + 1}/{len(pendientes)} "
-                f"explicaciones revisadas",
-                flush=True,
-            )
-
-    _guardar_lista(ya_hechas, ruta_cache)
+    reescritas = reescribir_en_paralelo(
+        pendientes, reescribir, ya_hechas, ruta_cache
+    )
 
     # Se aplican las mejoras al pool
     for mejora in ya_hechas:
@@ -1250,6 +1254,52 @@ PATRON_REFERENCIAS = re.compile(
     r"(?!\s+(refundido|consolidado))",
     re.IGNORECASE,
 )
+
+
+def reescribir_en_paralelo(
+    pendientes, reescribir, ya_hechas, ruta_cache, workers=WORKERS_POOL
+):
+    """Reescribe las explicaciones pendientes con varios hilos a la vez.
+
+    `reescribir(pregunta)` devuelve el texto nuevo o None. El progreso se
+    guarda cada 25 explicaciones, así que se puede cortar y reanudar. Los
+    resultados se aplican en el hilo principal: la lista compartida no se
+    toca desde los hilos.
+    """
+    indices_hechos = {p.get("indice") for p in ya_hechas}
+    faltan = [
+        (indice, pregunta)
+        for indice, pregunta in enumerate(pendientes)
+        if indice not in indices_hechos
+    ]
+    reescritas = 0
+
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as ejecutor:
+        futuros = {
+            ejecutor.submit(reescribir, pregunta): indice
+            for indice, pregunta in faltan
+        }
+        for revisadas, futuro in enumerate(as_completed(futuros), start=1):
+            indice = futuros[futuro]
+            try:
+                nueva = futuro.result()
+            except Exception:  # noqa: BLE001 - una explicación no puede cortar todo
+                nueva = None
+
+            if nueva:
+                ya_hechas.append({"indice": indice, "explicacion": nueva})
+                reescritas += 1
+
+            if revisadas % 25 == 0:
+                _guardar_lista(ya_hechas, ruta_cache)
+                print(
+                    f"  [checkpoint] {revisadas}/{len(faltan)} "
+                    "explicaciones revisadas",
+                    flush=True,
+                )
+
+    _guardar_lista(ya_hechas, ruta_cache)
+    return reescritas
 
 
 def _cargar_lista(ruta):

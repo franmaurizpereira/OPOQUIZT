@@ -239,6 +239,83 @@ class TestSeleccionChunksParaPool(unittest.TestCase):
         self.assertEqual(g.seleccionar_chunks_para_pool([], 100), [])
 
 
+class TestReescrituraEnParalelo(unittest.TestCase):
+    """Las explicaciones se reescriben en paralelo y se guarda el progreso."""
+
+    def test_reescribe_todas_las_pendientes(self):
+        pendientes = [
+            {"pregunta": f"Pregunta {i}", "opciones": ["a", "b", "c", "d"],
+             "correcta": 0, "explicacion": "El texto dice que es la opción a."}
+            for i in range(30)
+        ]
+
+        def reescribir(pregunta):
+            if pregunta["pregunta"].endswith("1"):
+                raise RuntimeError("fallo simulado")
+            return "Explicación reescrita y autosuficiente número " + pregunta["pregunta"]
+
+        with tempfile.TemporaryDirectory() as directorio:
+            ruta = Path(directorio) / "cache.json"
+            ya_hechas = []
+            reescritas = g.reescribir_en_paralelo(
+                pendientes, reescribir, ya_hechas, ruta, workers=4
+            )
+            guardadas = json.loads(ruta.read_text(encoding="utf-8"))
+
+        # Fallan las preguntas 1, 11 y 21: el resto se reescribe
+        self.assertEqual(reescritas, 27)
+        self.assertEqual(len(guardadas), 27)
+        self.assertTrue(all("indice" in p for p in guardadas))
+
+    def test_reanuda_sin_repetir_las_ya_hechas(self):
+        pendientes = [
+            {"pregunta": f"Pregunta {i}", "opciones": ["a", "b", "c", "d"],
+             "correcta": 0, "explicacion": "El texto dice que es la opción a."}
+            for i in range(10)
+        ]
+        with tempfile.TemporaryDirectory() as directorio:
+            ruta = Path(directorio) / "cache.json"
+            ya_hechas = [{"indice": i, "explicacion": "hecha"} for i in range(10)]
+            reescritas = g.reescribir_en_paralelo(
+                pendientes, lambda p: "nueva", ya_hechas, ruta, workers=2
+            )
+
+        self.assertEqual(reescritas, 0)
+
+
+class TestPrefijosDeOpciones(unittest.TestCase):
+    """Las opciones se publican sin la letra que algunos modelos añaden."""
+
+    def test_quita_una_o_varias_capas_de_prefijo(self):
+        self.assertEqual(g._sin_prefijo_opcion("A) uno"), "uno")
+        self.assertEqual(g._sin_prefijo_opcion("B) b) dos"), "dos")
+        self.assertEqual(g._sin_prefijo_opcion("c. tres"), "tres")
+
+    def test_no_toca_un_texto_que_empieza_por_letra(self):
+        self.assertEqual(
+            g._sin_prefijo_opcion("A los efectos de la ley"), "A los efectos de la ley"
+        )
+
+    def test_escribir_pool_json_publica_sin_prefijos(self):
+        with tempfile.TemporaryDirectory() as directorio:
+            ruta = Path(directorio) / "quiz_pool.json"
+            g.escribir_pool_json(
+                [
+                    {
+                        "pregunta": "¿Qué dice el artículo 14?",
+                        "opciones": ["A) uno", "B) dos", "C) tres", "D) cuatro"],
+                        "correcta": 1,
+                        "explicacion": "Explicación suficientemente larga.",
+                        "tema": "Constitución Española",
+                    }
+                ],
+                ruta,
+            )
+            datos = json.loads(ruta.read_text(encoding="utf-8"))
+
+        self.assertEqual(sorted(datos[0]["opciones"]), ["cuatro", "dos", "tres", "uno"])
+
+
 class TestTemasDelPool(unittest.TestCase):
     """El tema de cada pregunta se deduce del PDF del que sale."""
 

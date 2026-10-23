@@ -34,11 +34,13 @@
       Hecho cuando: `js/quiz_pool.json` tiene ≥1.950 preguntas, los 9
       temas, 85-435 por tema, sin fugas de inglés y sin «el texto» en las
       explicaciones.
-      **Bloqueada:** la cuenta de OpenRouter tiene **0 créditos**
-      (`total_credits: 0`); el modelo de pago devuelve 402 y el único
-      gratuito que responde invierte la opción correcta. Hacen falta ~1 $
-      de saldo. Mientras tanto `js/quiz_pool.json` se ha restaurado a las
-      600 preguntas que funcionaban.
+      **Bloqueada:** la cuenta de OpenRouter **nunca ha comprado
+      créditos** (402: «Insufficient credits»). La prueba gratuita se
+      agotó con 0,20 $ y 743 preguntas generadas, que están en la caché
+      para reanudar. DeepSeek Flash es el modelo más barato que responde
+      (~0,15 $ para el resto); el gratuito invierte la opción correcta.
+      Mientras tanto `js/quiz_pool.json` se ha restaurado a las 600
+      preguntas que funcionaban.
 
 - [ ] **4. Verificador y medidor de cobertura** (RF11, RF13)
       `backend/verificar_pool.py`: mínimo 1.900, `tema` obligatorio y
