@@ -97,6 +97,13 @@ Cualquier tarea que toque el quiz o `quiz.js` cierra únicamente si:
 - `npx playwright test` pasa todas las pruebas
   (Chromium desde `~/.cache/ms-playwright/chromium-1248/`).
 
+Cualquier tarea que toque el pool de preguntas cierra únicamente si:
+- `backend/verificar_pool.py` da **0 problemas**: ≥1.900 preguntas, los 9
+  temas con ≥50 cada uno, sin duplicados, sin inglés ni «el texto», y una
+  cobertura **medida** de **≥90 % del texto**, **≥85 % por documento** y
+  **≥95 % de las páginas** (contra la BD, no estimada).
+- `npx playwright test` sigue en verde (**55 pruebas**).
+
 Cualquier tarea que toque el sonido cierra únicamente si:
 - Se pide **un solo efecto por acción** (comprobado con los contadores de
   `window.OPOQUIZ_AUDIO`, no a oído).

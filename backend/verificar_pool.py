@@ -238,9 +238,11 @@ def comprobar(fichero, minimo, chunks=None, usados=None):
     fugas = []
     for numero, pregunta in enumerate(datos, start=1):
         texto = f"{pregunta.get('pregunta', '')} {pregunta.get('explicacion', '')}"
-        encontradas = PALABRAS_INGLESAS.findall(texto)
-        if encontradas:
-            fugas.append((numero, encontradas[0]))
+        encontradas = {palabra.lower() for palabra in PALABRAS_INGLESAS.findall(texto)}
+        # Una sola palabra puede ser un título («The Information Society…»);
+        # lo que delata una fuga es que haya varias palabras funcionales.
+        if len(encontradas) >= 2:
+            fugas.append((numero, sorted(encontradas)[0]))
     if fugas:
         ejemplo = ", ".join(f"#{n} «{p}»" for n, p in fugas[:3])
         problemas.append(f"{len(fugas)} preguntas con palabras en inglés ({ejemplo})")

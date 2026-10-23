@@ -266,3 +266,42 @@ las pruebas de comportamiento general.
 | 5 | Implementer | Pruebas (tareas 7-8) |
 | 6 | Implementer | Documentación (tarea 9) |
 | 7 | Reviewer | Veredicto contra los criterios de aceptación |
+
+## 6. Resultado final y desviaciones
+
+| Punto | Plan | Real |
+|---|---|---|
+| Preguntas | 2.100 | **2.647** |
+| Cobertura de texto | ≥90 % | **95,4 %** |
+| Cobertura por documento | ≥85 % | **91,1 % – 98,0 %** |
+| Páginas | ≥95 % | **98,6 %** |
+| Pruebas Playwright | ~58 | **55** |
+| Pruebas de backend | 35 | **62** |
+| Carga del pool | <150 ms | **83 ms** |
+
+Desviaciones y por qué:
+
+1. **2.100 → 2.647**: al medir con el pool a medias se vio que la generación
+   iba documento por documento y dejaba cuatro temarios al 0 %. Con 2.100 el
+   texto cubierto era el 84 %. Se intercalaron los documentos
+   (`generar_preguntas_pool`) y se subió el objetivo hasta cubrir el 93 % de
+   los fragmentos.
+2. **Intercalado por documento**: sin él, una ejecución parcial (o un pool
+   recortado) deja temarios enteros sin preguntas.
+3. **`IndiceDuplicados`**: comparar cada pregunta con las 2.000 anteriores
+   dominaba el tiempo de generación. El índice compara solo con las que
+   comparten palabras u opciones; hay una prueba que verifica que da el mismo
+   resultado que la fuerza bruta.
+4. **Semilla por enunciado**: con una única semilla para barajar opciones, el
+   41,6 % de las correctas caía en la A. Ahora cada pregunta usa una semilla
+   derivada de su enunciado.
+5. **Detector de inglés**: una sola palabra («The», título de un libro) no
+   cuenta como fuga; se exigen dos palabras funcionales distintas.
+6. **Proveedor remoto genérico**: `OPOQUIZ_API_BASE`, `OPOQUIZ_API_KEY`,
+   `OPOQUIZ_MODELO_REMOTO` y `OPOQUIZ_JSON_SCHEMA`. DeepSeek directo no acepta
+   `json_schema` (solo `json_object`) y razona antes de escribir, así que
+   necesita `max_tokens` 8192: con 4096 devolvía respuestas vacías.
+7. **Reescritura de explicaciones en paralelo**: era secuencial (2.071 × 5 s ≈
+   3 h); ahora 8 hilos y guardado cada 25 (2.071 en 10 min).
+8. **`OPOQUIZ_SIN_PUBLICAR`**: durante una generación larga la app sigue
+   sirviendo el pool bueno, no uno parcial con dos o tres temas.

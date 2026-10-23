@@ -6,16 +6,19 @@
 ## Estado actual
 - Flujo completo: 9 PDF → extracción → troceado → embeddings → **2555 chunks**
   (2090 texto / 465 tabla) en PostgreSQL 18 + pgvector 0.8.0 → 30 preguntas en
-  `js/quiz.js` → frontend Fallout 50s → `npx playwright test` **45/45**
-  (19 quiz + 7 pool + 9 revisión + 10 sonido) y `backend/test_pool.py` **35/35 ✅**.
-- Modelos Ollama: `locusai/all-minilm-l6-v2:latest` (embeddings, 384 dims) y
-  `qwen3.8:27b` (preguntas: ~60 s por lote de 3 → ~20 min el total).
-- **Pool de 600 preguntas** (`js/quiz_pool.json`, spec 003): cada partida sale
-  de 30 preguntas al azar, barajadas con las opciones. Se genera offline con
-  `python backend/generate_quiz.py --pool 600` y se publica en cada checkpoint,
-  así que se puede jugar mientras se genera. Sin pool, el frontend usa
-  `js/quiz.js`. Verificado con `backend/verificar_pool.py`: 9 documentos,
-  reparto 10,1 %–11,3 %, sin duplicados, correcta repartida.
+  `js/quiz.js` → frontend Fallout 50s → `npx playwright test` **55/55**
+  (19 quiz + 8 pool + 9 revisión + 10 sonido + 9 temario) y
+  `backend/test_pool.py` **62/62 ✅**.
+- Modelos Ollama: `locusai/all-minilm-l6-v2:latest` (embeddings, 384 dims),
+  `qwen3.8:27b` (local, ~66 s por pregunta) y `qwen3:14b`/`qwen3:8b` para
+  pruebas. Para generar de verdad: un API compatible con OpenAI (DeepSeek
+  Flash directo u OpenRouter), configurable por entorno.
+- **Pool de 2.647 preguntas** (`js/quiz_pool.json`, spec 007): 9 temas
+  (97–624 por tema), **95,4 % del texto** y 98,6 % de las páginas cubiertas.
+  Cada pregunta lleva su `tema`; la partida reparte 3 por tema + 3 libres y
+  prefiere las no vistas (rotación en `localStorage`, `opoquiz-vistas`), con
+  reinicio de ciclo al agotarse. Sin pool, el frontend usa `js/quiz.js`.
+  `backend/verificar_pool.py` comprueba también la cobertura contra la BD.
 - **Revisión de la partida** (spec 004): al terminar, REVISAR PARTIDA abre una
   modal con las 30 preguntas, la correcta, la elegida y la explicación, con
   filtros y resumen. El detalle se guarda en `data/partidas.json` y se puede
@@ -46,6 +49,20 @@
 audio en el repositorio, no hay licencias que documentar y no hay que abrir
 carpetas nuevas en `server.py`. Descartado servir `.ogg` (100–300 KB + CC0 +
 whitelist del servidor).
+- **Cobertura medida, no estimada**: 90 % del texto, 85 % por documento y
+  95 % de las páginas. Se mide con `cobertura()` en `verificar_pool.py`
+  uniendo los `contexto_id` de la caché con la BD. Se descartó medir por
+  número de fragmentos: el 11 % de los trozos solo tiene el 2,3 % del texto.
+- **Reparto proporcional al texto y fragmentos intercalados por documento**:
+  el reparto igual por PDF dejaba a Gobierno y TREBEP al 14 %; y generar en
+  bloques por documento dejaba cuatro temarios al 0 % si la ejecución se
+  cortaba. Ahora se intercala antes de trocear en lotes.
+- **Semilla de opciones por enunciado**: con una sola semilla el 41,6 % de
+  las correctas caía en la A; ahora cada pregunta baraja con la semilla de su
+  enunciado (FNV-1a).
+- **`IndiceDuplicados`**: comparar cada pregunta con las 2.000 anteriores
+  dominaba el tiempo. El índice compara solo las que comparten palabras u
+  opciones; una prueba lo compara con la fuerza bruta.
 - **pgvector a mano**: el paquete de Fedora no coincidía con el `sharedir` de
   PostgreSQL 18 (PGDG); se copiaron `vector*` y `vector.so` a `/usr/pgsql-18/`.
   **Repetir tras cada actualización de PostgreSQL**.

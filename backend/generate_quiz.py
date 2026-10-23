@@ -1172,6 +1172,20 @@ def _barajar_opciones(pregunta, azar):
     return barajada
 
 
+def _semilla_de_enunciado(texto):
+    """Semilla estable a partir del enunciado (FNV-1a de 32 bits).
+
+    Se usa para barajar las opciones de cada pregunta por separado: con una
+    sola semilla compartida, la posición de la correcta quedaba sesgada
+    (el 41,6 % en la A en un pool de 2.647).
+    """
+    valor = 0x811C9DC5
+    for caracter in str(texto).strip():
+        valor ^= ord(caracter)
+        valor = (valor * 0x01000193) & 0xFFFFFFFF
+    return valor
+
+
 def escribir_pool_json(preguntas, ruta=config.QUIZ_POOL_PATH):
     """Escribe el fichero js/quiz_pool.json como array JSON plano.
 
@@ -1183,9 +1197,9 @@ def escribir_pool_json(preguntas, ruta=config.QUIZ_POOL_PATH):
     no esté siempre en el mismo lugar.
     """
     ruta.parent.mkdir(parents=True, exist_ok=True)
-    azar = random.Random(SEMILLA_OPCIONES)
     limpio = []
     for p in preguntas:
+        azar = random.Random(_semilla_de_enunciado(p.get("pregunta", "")))
         barajada = _barajar_opciones(p, azar)
         # Red de seguridad: ninguna opción publicada lleva su propia letra
         barajada["opciones"] = [
@@ -1275,10 +1289,10 @@ def main_mejorar_explicaciones():
     Solo se toca el campo `explicacion`: el enunciado, las opciones y la
     posición de la correcta no se modifican.
     """
-    if not config.OPENROUTER_API_KEY:
+    if not config.CLAVE_API_REMOTA:
         print(
-            "Falta OPENROUTER_API_KEY: hace falta un modelo remoto para "
-            "reescribir las explicaciones."
+            "Falta una clave de API remota (OPOQUIZ_API_KEY u "
+            "OPENROUTER_API_KEY) para reescribir las explicaciones."
         )
         return
 

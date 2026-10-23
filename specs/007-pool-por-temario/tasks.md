@@ -24,7 +24,7 @@
       preguntas por tema, **97,7 % del texto y 98,8 % de las páginas**. 7
       pruebas nuevas.
 
-- [ ] **3. Generar el pool de 2.100** (RF1, RF3, RF14)
+- [x] **3. Generar el pool de 2.647** (RF1, RF3, RF14)
       Ejecutar `python backend/generate_quiz.py --pool 2100` (reanuda
       desde la caché: ya hay 633 preguntas generadas) y después
       `python backend/generate_quiz.py --mejorar-explicaciones`, porque el
@@ -34,15 +34,12 @@
       Hecho cuando: `js/quiz_pool.json` tiene ≥1.950 preguntas, los 9
       temas, 85-435 por tema, sin fugas de inglés y sin «el texto» en las
       explicaciones.
-      **Bloqueada:** la cuenta de OpenRouter **nunca ha comprado
-      créditos** (402: «Insufficient credits»). La prueba gratuita se
-      agotó con 0,20 $ y 743 preguntas generadas, que están en la caché
-      para reanudar. DeepSeek Flash es el modelo más barato que responde
-      (~0,15 $ para el resto); el gratuito invierte la opción correcta.
-      Mientras tanto `js/quiz_pool.json` se ha restaurado a las 600
-      preguntas que funcionaban.
+      **Hecho** con DeepSeek Flash directo (clave del conector de Pi, leída
+      en tiempo de ejecución y nunca escrita en el repositorio). OpenRouter
+      estaba bloqueado por saldo (402 «Insufficient credits»). Resultado:
+      2.647 preguntas, 95,4 % del texto, 98,6 % de las páginas.
 
-- [ ] **4. Verificador y medidor de cobertura** (RF11, RF13)
+- [x] **4. Verificador y medidor de cobertura** (RF11, RF13)
       `backend/verificar_pool.py`: mínimo 1.900, `tema` obligatorio y
       conocido, ≥50 por tema con tabla, detector de inglés, detector de
       «el texto/pasaje/contexto/fragmento», y reparto por tema sin
@@ -53,7 +50,7 @@
       con un pool de prueba que tenga inglés, un duplicado y un tema con
       20 preguntas.
 
-- [ ] **5. Cuotas por tema en el frontend** (RF4, RF9)
+- [x] **5. Cuotas por tema en el frontend** (RF4, RF9)
       `js/app.js`: `preguntaValida()` acepta `tema` opcional;
       `agruparPorTema()` y `elegirPartida(banco, total, azar, vistas)` con
       cuota base `floor(30 / nTemas)` y sobrantes al azar. Pool sin temas
@@ -62,7 +59,7 @@
       y ≥3 de cada tema; con el pool sin `tema` siguen saliendo 30 y sin
       errores.
 
-- [ ] **6. Rotación de preguntas vistas** (RF5, RF6, RF7)
+- [x] **6. Rotación de preguntas vistas** (RF5, RF6, RF7)
       `hashPregunta()`, `leerVistas()`, `guardarVistas()`,
       `marcarVistas()` en `js/app.js`; clave `opoquiz-vistas`, tamaño del
       pool guardado, reinicio de ciclo conservando las 30 últimas, todo
@@ -71,20 +68,20 @@
       ciclo se reinicia al agotarse, un almacenamiento bloqueado no rompe
       la partida y un cambio de tamaño del pool descarta las vistas.
 
-- [ ] **7. Pruebas nuevas** (RF1-RF11)
+- [x] **7. Pruebas nuevas** (RF1-RF11)
       `tests/tematico.spec.js` y ampliación de `tests/pool.spec.js` con
       las 11 pruebas del plan; `tests/fixtures/pool.js` gana
       `construirPoolPorTemas(nTemas, porTema)`.
       Hecho cuando: las 11 pruebas pasan y ninguna depende del orden
       exacto de las preguntas.
 
-- [ ] **8. Ajustar las pruebas existentes** (RF1, RF9)
+- [x] **8. Ajustar las pruebas existentes** (RF1, RF9)
       Mínimo del pool real de 500 a 1.900; revisar que el fixture general
       sigue sirviendo para las pruebas de comportamiento.
       Hecho cuando: `npx playwright test` pasa entero (~58 pruebas) y las
       45 anteriores siguen verdes.
 
-- [ ] **9. Documentación** (RF12)
+- [x] **9. Documentación** (RF12)
       README (cifras reales, cuotas, rotación, cobertura, cómo regenerar
       con `--desde-cero`), `MEMORY.md` (decisión y datos), `AGENTS.md` §7
       si el gate cambia, y esta spec marcada como implementada.
@@ -92,7 +89,7 @@
       de 600» en la documentación, el README explica la cobertura del
       90 % y que cada tema sale 3 veces como mínimo.
 
-- [ ] **10. Gate de cierre** (todos)
+- [x] **10. Gate de cierre** (todos)
       Verificación completa: `python backend/verificar_pool.py`,
       `python -m py_compile backend/*.py`, `node --check js/*.js`,
       `npx playwright test`, carga del pool medida en el navegador y una

@@ -90,9 +90,9 @@ psql -f backend/db.sql
 # 5. Generar las 30 preguntas y volcar js/quiz.js
 .venv/bin/python backend/generate_quiz.py
 
-# 5-bis. (Opcional) Generar el pool grande de preguntas para partidas distintas
-#           Con el modelo local tarda horas; con OPENROUTER_API_KEY, ~35 min
-.venv/bin/python backend/generate_quiz.py --pool 600
+# 5-bis. (Opcional) Generar el pool de preguntas para partidas distintas
+#           Con modelo remoto, minutos; con el local, horas
+.venv/bin/python backend/generate_quiz.py --pool 2650
 
 # 6. Servir la web (interfaz + historial de partidas)
 .venv/bin/python backend/server.py --port 8099
@@ -112,14 +112,22 @@ npx playwright test  # valida los datos y el comportamiento del quiz
 
 Las pruebas del pool (`tests/pool.spec.js`) comprueban que el frontend usa el
 pool cuando está disponible y que, si no lo está, sigue jugando con
-`js/quiz.js`. Los dos primeros tests exigen que `js/quiz_pool.json` exista
-con al menos 500 preguntas: si todavía no se ha generado, fallan.
+`js/quiz.js`. Exigen que `js/quiz_pool.json` exista con al menos **1.900
+preguntas**, los **9 temas** y ≥50 por tema: si todavía no se ha generado,
+fallan.
+
+Las pruebas del reparto por temario y de la rotación
+(`tests/tematico.spec.js`) comprueban con un pool de prueba que cada partida
+tiene 30 preguntas y al menos 3 de cada tema, que dos partidas seguidas no
+comparten ninguna, que al agotar el pool el ciclo se reinicia sin repetir la
+última partida, que un cambio de tamaño del pool descarta las vistas y que
+sin `localStorage` se juega igual.
 
 Las pruebas del sonido (`tests/sonido.spec.js`) no pueden oír nada en un
 navegador sin altavoces: comprueban los contadores que expone
 `window.OPOQUIZ_AUDIO` (un efecto por acción, ninguno antes del primer gesto,
 ninguno con el sonido apagado) y que, sin Web Audio, la partida sigue
-funcionando. En total son **45 pruebas** de Playwright.
+funcionando. En total son **55 pruebas** de Playwright.
 
 Las pruebas se ejecutan **de una en una** (`workers: 1` en
 `playwright.config.js`): comparten un único servidor y un único fichero de
@@ -167,9 +175,17 @@ opciones de cada una, así que la respuesta correcta no siempre está en la
 misma posición.
 
 Además, si existe el **pool de preguntas** (`js/quiz_pool.json`), cada partida
-sale de 30 preguntas elegidas al azar entre todas las del pool: es un examen
-distinto en cada partida. Si el pool no está o no se puede cargar, el quiz
-sigue funcionando con las 30 preguntas fijas de `js/quiz.js`.
+sale de 30 preguntas del pool: es un examen distinto en cada partida. El pool
+tiene 9 temas, y el reparto es **3 preguntas de cada tema + 3 libres**, así
+que ninguna partida deja un temario fuera.
+
+Y no se repiten preguntas mientras queden sin ver: el navegador recuerda en
+`localStorage` (`opoquiz-vistas`) qué preguntas han salido, prefiere las que
+no han aparecido y, cuando se agota el pool, empieza un ciclo nuevo sin
+repetir de inmediato las 30 últimas. No se envía nada a la red.
+
+Si el pool no está o no se puede cargar, el quiz sigue funcionando con las 30
+preguntas fijas de `js/quiz.js` (sin cuotas ni rotación).
 
 ## Revisar la partida
 
@@ -206,49 +222,88 @@ la revisión y al terminar (el tono final cambia según la puntuación).
 
 ### Generar el pool de preguntas
 
-El pool se genera **una sola vez, offline**, con un modelo de lenguaje:
+El pool se genera **una sola vez, offline**, con un modelo de lenguaje. El
+pool actual tiene **2.647 preguntas** de los 9 temarios:
+
+| Tema | Preguntas |
+|---|---:|
+| Estatuto Básico del Empleado Público | 624 |
+| Igualdad y violencia de género | 543 |
+| Gobierno | 437 |
+| Acceso electrónico de los ciudadanos | 249 |
+| Protección de datos | 237 |
+| Sociedad de la información | 230 |
+| Cortes Generales | 124 |
+| Constitución Española | 106 |
+| Instrumentos de acceso electrónico | 97 |
+
+Cubre el **95,4 % del texto** de la base de datos y el **98,6 % de las
+páginas** (lo mide `verificar_pool.py` contra PostgreSQL, no se estima).
+
+Cómo se reparte:
+
+- El reparto de fragmentos es **proporcional al texto de cada documento**, no
+  igual por documento: el reparto igual dejaba a los documentos largos al
+  14 % de su contenido mientras los cortos iban al 78 %.
+- Dentro de cada documento se toma **primero el fragmento más largo de cada
+  página** y después los más largos que quedan.
+- Los fragmentos se **intercalan entre documentos** antes de generar, para
+  que una ejecución a medias no deje temarios enteros sin tocar.
+- Cada pregunta lleva su `tema`; la partida reparte 3 por tema y 3 libres.
 
 ```bash
-.venv/bin/python backend/generate_quiz.py --pool 600
+.venv/bin/python backend/generate_quiz.py --pool 2650
 ```
 
-- Genera hasta **600 preguntas** repartidas por los 9 PDF (ningún PDF puede
-  superar el 30 % del pool) y las deja en `js/quiz_pool.json`.
-- **El modelo puede ser local o remoto**:
-  - **Local** (por defecto): el modelo de Ollama `qwen3.8:27b`. Funciona sin
-    red, pero va lento: ~29 s por pregunta (unas 5 horas para 600).
-  - **Remoto (recomendado)**: si está definida la variable de entorno
-    `OPENROUTER_API_KEY`, se usa OpenRouter con el modelo gratuito
-    `minimax/minimax-m3.1-flash:free`: ~6 s por pregunta (unos 35 minutos).
-    La clave **no** se guarda en el repo:
+**Modelo**: local o remoto.
 
-    ```bash
-    export OPENROUTER_API_KEY="sk-or-v1-..."
-    .venv/bin/python backend/generate_quiz.py --pool 600
-    ```
-
-- Se puede dejar corriendo en segundo plano:
+- **Remoto (recomendado)**: cualquier API compatible con OpenAI.
 
   ```bash
-  setsid .venv/bin/python backend/generate_quiz.py --pool 600 > logs/pool.log 2>&1 &
+  # DeepSeek directo: no acepta json_schema, sí json_object
+  export OPOQUIZ_API_BASE=https://api.deepseek.com/chat/completions
+  export OPOQUIZ_API_KEY="sk-..."
+  export OPOQUIZ_MODELO_REMOTO=deepseek-flash
+  export OPOQUIZ_JSON_SCHEMA=0
+  .venv/bin/python backend/generate_quiz.py --pool 2650
+
+  # OpenRouter (modelo por defecto: deepseek/deepseek-v4-flash)
+  export OPENROUTER_API_KEY="sk-or-v1-..."
+  .venv/bin/python backend/generate_quiz.py --pool 2650
   ```
 
+  Las claves **no** se guardan en el repositorio.
+
+- **Local**: `qwen3.8:27b` (sin red, pero ~66 s por pregunta) o
+  `qwen3:14b` con `export OPOQUIZ_MODELO_LOCAL=qwen3:14b`.
+
+Ajustes por variable de entorno:
+
+| Variable | Para qué | Defecto |
+|---|---|---|
+| `OPOQUIZ_WORKERS` | peticiones en paralelo | 8 |
+| `OPOQUIZ_LOTE` | fragmentos por petición | 4 |
+| `OPOQUIZ_POR_FRAGMENTO` | preguntas por fragmento | 1 |
+| `OPOQUIZ_MAX_TOKENS` | tope de respuesta | 8192 |
+| `OPOQUIZ_SIN_PUBLICAR` | no sobrescribir el pool bueno mientras genera | 0 |
+| `OPOQUIZ_MODELO_LOCAL` | modelo de Ollama | `qwen3.8:27b` |
+
 - **Es reanudable**: el progreso se guarda en `logs/pool_cache.json` cada 25
-  preguntas. Si se corta (Ctrl+C, reinicio, corte de luz), se relanza el mismo
-  comando y continúa donde lo dejó, sin repetir ni perder lo ya generado.
-- El pool se **publica a medias** en cada checkpoint, así que se puede jugar
-  mientras la generación sigue en marcha.
-- Para regenerarlo tras cambiar los PDF: se borra `logs/pool_cache.json` y
-  `js/quiz_pool.json`, y se vuelve a lanzar el comando.
+  preguntas. Si se corta, se relanza el mismo comando y continúa.
+- El pool se **publica a medias** en cada checkpoint, salvo con
+  `OPOQUIZ_SIN_PUBLICAR=1`.
+- Para regenerarlo de cero: `--desde-cero` (aparta la caché anterior y no
+  reutiliza nada).
 - Para comprobar el resultado:
 
   ```bash
   .venv/bin/python backend/verificar_pool.py
   ```
 
-  Indica cuántas preguntas hay, el reparto por documento, que no haya
-  duplicados y que la respuesta correcta esté repartida entre las cuatro
-  opciones.
+  Comprueba el número de preguntas, que estén los 9 temas con ≥50 cada uno,
+  que no haya duplicados, inglés, explicaciones que hablan de «el texto» ni
+  sesgo en la posición de la correcta, y mide la cobertura: **≥90 % del
+  texto**, **≥85 % por documento** y **≥95 % de las páginas**.
 
 ### Mejorar las explicaciones del pool
 
@@ -257,7 +312,10 @@ al documento del que salieron. En la revisión de la partida esas palabras no
 significan nada, así que se pueden reescribir para que se entiendan solas:
 
 ```bash
-export OPENROUTER_API_KEY="sk-or-v1-..."
+export OPOQUIZ_API_BASE=https://api.deepseek.com/chat/completions
+export OPOQUIZ_API_KEY="sk-..."
+export OPOQUIZ_MODELO_REMOTO=deepseek-flash
+export OPOQUIZ_JSON_SCHEMA=0
 .venv/bin/python backend/generate_quiz.py --mejorar-explicaciones
 ```
 
@@ -268,8 +326,10 @@ export OPENROUTER_API_KEY="sk-or-v1-..."
   hablando de "el texto"), se conserva la anterior: el pool nunca empeora.
 - Se puede parar y reanudar: el progreso queda en
   `logs/explicaciones_cache.json`.
-- El modelo es el mismo que el del pool (`minimax/minimax-m3.1-flash:free`),
-  pero se puede cambiar con la variable `OPENROUTER_MODEL`.
+- Se reescriben en paralelo (8 hilos por defecto): 2.071 explicaciones en
+  unos 10 minutos.
+- El modelo es el mismo que el del pool (el remoto configurado o el local),
+  y se puede cambiar con `OPOQUIZ_MODELO_REMOTO` / `OPENROUTER_MODEL`.
 
 El banco de preguntas se revisa con:
 ```bash
@@ -321,7 +381,8 @@ El trabajo se apoya en `specs/NNN-nombre/`, con `spec.md` (qué y por qué),
 ├── tests/pool.spec.js         ← pruebas de Playwright del pool
 ├── tests/revision.spec.js     ← pruebas de Playwright de la revisión
 ├── tests/sonido.spec.js       ← pruebas de Playwright del sonido
-├── tests/fixtures/pool.js     ← pool de prueba para las pruebas
+├── tests/tematico.spec.js     ← pruebas de cuotas por tema y rotación
+├── tests/fixtures/pool.js     ← pools de prueba para las pruebas
 ├── playwright.config.js       ← configuración de Playwright
 ├── package.json               ← dependencias de Node (solo tests)
 ├── mcp.json                   ← servidores MCP del proyecto (sin claves)

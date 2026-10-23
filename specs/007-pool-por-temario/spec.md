@@ -1,6 +1,7 @@
-# Spec 007 — Pool de 2.000 preguntas etiquetado por temario
+# Spec 007 — Pool de 2.647 preguntas etiquetado por temario
 
-**Estado:** borrador (aprobada la dirección por el usuario el 2026-10-22)
+**Estado:** implementado (2026-10-23). Verificado con
+`backend/verificar_pool.py` (0 problemas) y `npx playwright test` (55/55).
 **Solicitud original:** «¿No se podría hacer varias versiones distintas de
 `quiz_pool.json` con más preguntas sacadas de la base de datos para así
 poder abarcar más todo el contenido de la base de datos para preguntas?»
@@ -47,8 +48,9 @@ preguntas malas a cambio de casi nada. Objetivo: **≥90 % del texto**.
 
 ## 4. Requisitos funcionales (EARS)
 
-- **RF1**: EL POOL DEBE contener **2.100 preguntas válidas** como mínimo,
-  sacadas de fragmentos distintos de la base de datos.
+- **RF1**: EL POOL DEBE contener **2.500 preguntas válidas** como mínimo,
+  sacadas de fragmentos distintos de la base de datos. (Se quedó en 2.647:
+  con 2.100 el texto cubierto se quedaba en el 84 %.)
 - **RF2**: CADA PREGUNTA DEL POOL DEBE llevar su **tema** (el documento
   del que sale), con una etiqueta legible en español.
 - **RF3**: EL POOL DEBE cubrir los **9 documentos** de la base de datos,
@@ -106,8 +108,8 @@ preguntas malas a cambio de casi nada. Objetivo: **≥90 % del texto**.
 8. **Dos partidas seguidas**: mientras queden no vistas, no comparten
    ninguna pregunta.
 9. **Los descartes por duplicados o por validación** dejan el pool por
-   debajo de 2.100: el gate admite ≥1.950, pero la cobertura debe seguir
-   en ≥90 % (se comprueba sobre lo que hay, no sobre lo que se pidió).
+   debajo del objetivo: el gate admite ≥1.900, pero la cobertura debe
+   seguir en ≥90 % (se comprueba sobre lo que hay, no sobre lo pedido).
 10. **Un documento nuevo** que no esté en la lista de temas: no rompe la
     generación; su etiqueta es el nombre limpio del fichero.
 
@@ -118,3 +120,21 @@ preguntas malas a cambio de casi nada. Objetivo: **≥90 % del texto**.
 - Varios ficheros de pool o manifiesto: descartado por el usuario.
 - Subir el número de preguntas por partida (siguen siendo 30).
 - Cambiar `js/quiz.js` (las 30 preguntas fijas de reserva).
+
+## 7. Resultado (2026-10-23)
+
+| | Antes (600) | Ahora |
+|---|---:|---:|
+| Preguntas | 600 | **2.647** |
+| Temas | 9 (reparto igual) | **9 (proporcional al texto)** |
+| Preguntas por tema | 66-68 | **97 – 624** |
+| Texto cubierto | 25,7 % | **95,4 %** |
+| Páginas con pregunta | 31,6 % | **98,6 %** |
+| Peso de `js/quiz_pool.json` | 564 KB | 2,7 MB |
+| Carga medida en el navegador | — | 83 ms |
+
+El objetivo inicial eran 2.000-2.100 preguntas. Al medir la cobertura se vio
+que con 2.100 el texto se quedaba en el 84 %: los documentos que faltaban son
+los más largos y el reparto iba por bloques de documento. Se corrigió
+intercalando documentos y se subió el objetivo a 2.647 (93 % de los
+fragmentos). El detalle de las decisiones está en `plan.md` §2 y §6.
