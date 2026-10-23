@@ -95,3 +95,32 @@ function construirPool(numero) {
 const POOL_PRUEBA = construirPool(60);
 
 module.exports = { POOL_PRUEBA, construirPool };
+
+/**
+ * Construye un pool de prueba repartido en temas.
+ *
+ * Cada tema recibe `porTema` preguntas seguidas, con la etiqueta que se
+ * indica (o «Tema 1», «Tema 2»… por defecto). Los enunciados y las
+ * opciones siguen siendo únicos, así que el juego no descarta ninguna por
+ * repetir opciones.
+ *
+ * @param {number} numeroTemas Cuántos temas tiene el pool
+ * @param {number} porTema Cuántas preguntas aporta cada tema
+ * @param {string[]} [etiquetas] Nombres de los temas
+ * @returns {Array} Array de preguntas con el esquema del pool real
+ */
+function construirPoolPorTemas(numeroTemas, porTema, etiquetas) {
+    const nombres = etiquetas || Array.from(
+        { length: numeroTemas },
+        (_, i) => 'Tema ' + (i + 1)
+    );
+    const pool = construirPool(numeroTemas * porTema);
+
+    pool.forEach((pregunta, indice) => {
+        pregunta.tema = nombres[Math.floor(indice / porTema)];
+    });
+
+    return pool;
+}
+
+module.exports = { POOL_PRUEBA, construirPool, construirPoolPorTemas };

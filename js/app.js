@@ -16,6 +16,12 @@
     // Fichero con el pool grande de preguntas (generado offline)
     const FICHERO_POOL = 'js/quiz_pool.json';
 
+    // Clave de localStorage donde se recuerdan las preguntas ya vistas
+    const CLAVE_VISTAS = 'opoquiz-vistas';
+
+    // Tope de hashes guardados (el pool puede crecer)
+    const MAXIMO_VISTAS = 3000;
+
     // Banco de preguntas disponible: el pool si se ha podido cargar y,
     // si no, las 30 preguntas fijas de js/quiz.js
     let banco = quizData;
@@ -27,6 +33,10 @@
     // Promesa de carga del pool: se comparte para no descargarlo dos veces
     // ni reconstruir el quiz a mitad de partida
     let promesaPool = null;
+
+    // Estado de rotación de la partida recién montada, pendiente de guardar
+    // hasta que el jugador la empieza de verdad
+    let vistasPendientes = null;
 
     // Indica si el jugador ya ha empezado una partida
     let juegoIniciado = false;
@@ -208,7 +218,11 @@
             pregunta.correcta >= 0 &&
             pregunta.correcta <= 3 &&
             typeof pregunta.explicacion === 'string' &&
-            pregunta.explicacion.length > 0
+            pregunta.explicacion.length > 0 &&
+            // El tema es opcional: los pools antiguos no lo traen y se
+            // juegan como siempre, sin cuotas ni rotación
+            (pregunta.tema === undefined ||
+                (typeof pregunta.tema === 'string' && pregunta.tema.length > 0))
         );
     }
 
@@ -263,59 +277,255 @@
     }
 
     /**
-     * Elige las preguntas de la partida al azar del banco disponible.
+     * Elige las preguntas de la partida del banco disponible.
      *
-     * Se baraja el banco entero y se toman las primeras `TOTAL`, así que
-     * ninguna se repite dentro de la partida. El banco no se modifica.
+     * Con un pool etiquetado por temas se reparte una cuota a cada tema
+     * (3 por tema con 9 temas y 30 preguntas) y se prefieren las preguntas
+     * que el jugador no ha visto todavía. Las que sobran se reparten al
+     * azar. Así ninguna partida deja un temario fuera y no se repiten
+     * preguntas mientras queden sin ver.
+     *
+     * Sin temas (pool antiguo o banco de reserva de `js/quiz.js`) se
+     * baraja el banco entero como antes.
      *
      * Además se evita que dos preguntas de la misma partida tengan alguna
-     * opción repetida: son las que delatan la respuesta al jugador. Si con
-     * esa restricción no se llegan a 30 preguntas, se completa con las que
-     * quedan, que siempre hay.
+     * opción repetida: son las que delatan la respuesta al jugador.
      */
-    function elegirPartida() {
-        const barajado = banco.slice();
-        for (let i = barajado.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            const temporal = barajado[i];
-            barajado[i] = barajado[j];
-            barajado[j] = temporal;
+    function elegirPartida(lista, total, azar) {
+        const fuente = lista || banco;
+        const cuantas = total || TOTAL;
+        const aleatorio = azar || Math.random;
+        const previas = leerVistas();
+        const grupos = agruparPorTema(fuente);
+
+        // Sin temas no hay cuotas: se baraja y se toman las primeras
+        if (grupos.size < 2) {
+            return barajar(fuente.slice(), aleatorio).slice(0, cuantas);
         }
 
-        // Normaliza el texto de las opciones para comparar sin la letra
-        const sinLetra = function (opcion) {
-            return String(opcion).replace(/^[A-D]\)\s*/, '').trim().toLowerCase();
-        };
+        const vistas = new Set(previas.vistas);
+        let noVistas = fuente.filter(function (pregunta) {
+            return !vistas.has(hashPregunta(pregunta.pregunta));
+        });
+
+        // Ciclo agotado: se empieza de nuevo conservando solo la última
+        // partida, para no repetir de inmediato las 30 anteriores
+        if (noVistas.length < cuantas) {
+            vistas.clear();
+            previas.ultimas.forEach(function (hash) {
+                vistas.add(hash);
+            });
+            noVistas = fuente.filter(function (pregunta) {
+                return !vistas.has(hashPregunta(pregunta.pregunta));
+            });
+        }
 
         const elegidas = [];
+        const usadas = new Set();
         const opcionesUsadas = {};
-        const sobrantes = [];
 
-        for (let i = 0; i < barajado.length; i++) {
-            const pregunta = barajado[i];
-            const textos = pregunta.opciones.map(sinLetra);
-            const repetida = textos.some(function (texto) {
+        // Texto de las opciones sin la letra ("A) "), en minúsculas
+        function textos(pregunta) {
+            return pregunta.opciones.map(function (opcion) {
+                return String(opcion).replace(/^[A-D]\)\s*/, '').trim().toLowerCase();
+            });
+        }
+
+        function anadir(pregunta) {
+            if (elegidas.length >= cuantas || usadas.has(pregunta)) {
+                return false;
+            }
+            const repetida = textos(pregunta).some(function (texto) {
                 return opcionesUsadas[texto];
             });
-
-            if (elegidas.length < TOTAL && !repetida) {
-                elegidas.push(pregunta);
-                textos.forEach(function (texto) {
-                    opcionesUsadas[texto] = true;
-                });
-            } else {
-                sobrantes.push(pregunta);
+            if (repetida) {
+                return false;
             }
+            elegidas.push(pregunta);
+            usadas.add(pregunta);
+            textos(pregunta).forEach(function (texto) {
+                opcionesUsadas[texto] = true;
+            });
+            return true;
         }
 
-        // Si no se han juntado 30 preguntas sin opciones repetidas, se
-        // completa con las que quedan: es preferible un par de opciones
-        // repetidas a quedarse sin partida.
-        for (let i = 0; i < sobrantes.length && elegidas.length < TOTAL; i++) {
-            elegidas.push(sobrantes[i]);
+        // Cuota base por tema: con 9 temas y 30 preguntas, 3 cada uno
+        const base = Math.floor(cuantas / grupos.size);
+
+        grupos.forEach(function (preguntas) {
+            const barajadas = barajar(preguntas.slice(), aleatorio);
+            const nuevas = barajadas.filter(function (pregunta) {
+                return !vistas.has(hashPregunta(pregunta.pregunta));
+            });
+            const yaVistas = barajadas.filter(function (pregunta) {
+                return vistas.has(hashPregunta(pregunta.pregunta));
+            });
+
+            let puestas = 0;
+            nuevas.concat(yaVistas).forEach(function (pregunta) {
+                if (puestas >= base) {
+                    return;
+                }
+                if (anadir(pregunta)) {
+                    puestas += 1;
+                }
+            });
+        });
+
+        // Las que sobran hasta 30: primero las no vistas, luego el resto
+        const restantes = barajar(
+            noVistas.filter(function (pregunta) {
+                return !usadas.has(pregunta);
+            }),
+            aleatorio
+        ).concat(
+            barajar(
+                fuente.filter(function (pregunta) {
+                    return !usadas.has(pregunta);
+                }),
+                aleatorio
+            )
+        );
+
+        for (let i = 0; i < restantes.length && elegidas.length < cuantas; i++) {
+            anadir(restantes[i]);
         }
 
-        return elegidas.slice(0, TOTAL);
+        // Último recurso: si el filtro de opciones repetidas impide llegar
+        // a 30, se completa aunque alguna opción se repita
+        if (elegidas.length < cuantas) {
+            fuente.forEach(function (pregunta) {
+                if (elegidas.length >= cuantas || usadas.has(pregunta)) {
+                    return;
+                }
+                elegidas.push(pregunta);
+                usadas.add(pregunta);
+            });
+        }
+
+        // La partida se marca como vista cuando el jugador la empieza (ver
+        // marcarVistas): así el repintado que se hace al cargar el pool no
+        // gasta preguntas que nadie ha llegado a ver
+        vistasPendientes = { vistas: Array.from(vistas) };
+
+        return elegidas.slice(0, cuantas);
+    }
+
+    /**
+     * Hash FNV-1a de 32 bits del enunciado.
+     *
+     * Se guarda el hash y no el texto para no llenar `localStorage`. Con
+     * 2.100 preguntas, dos hashes iguales son prácticamente imposibles.
+     */
+    function hashPregunta(texto) {
+        let hash = 0x811c9dc5;
+        const limpio = String(texto).trim();
+        for (let i = 0; i < limpio.length; i++) {
+            hash ^= limpio.charCodeAt(i);
+            hash = Math.imul(hash, 0x01000193) >>> 0;
+        }
+        return hash.toString(16).padStart(8, '0');
+    }
+
+    /**
+     * Lee las preguntas vistas de `localStorage`.
+     *
+     * Devuelve `{ vistas, ultimas }`. Si no hay nada guardado, el fichero
+     * está corrupto, el almacenamiento falla o el pool ha cambiado de
+     * tamaño (se regeneró), se empieza un ciclo limpio.
+     */
+    function leerVistas() {
+        const vacio = { vistas: [], ultimas: [] };
+        try {
+            const guardado = window.localStorage.getItem(CLAVE_VISTAS);
+            if (!guardado) {
+                return vacio;
+            }
+            const datos = JSON.parse(guardado);
+            if (!datos || datos.tamano !== banco.length || !Array.isArray(datos.hashes)) {
+                return vacio;
+            }
+            return {
+                vistas: datos.hashes.map(String),
+                ultimas: Array.isArray(datos.ultimas)
+                    ? datos.ultimas.map(String)
+                    : []
+            };
+        } catch (error) {
+            // Sin almacenamiento se juega igual, sin rotación
+            return vacio;
+        }
+    }
+
+    /**
+     * Recuerda las preguntas de la partida que acaba de empezar el jugador.
+     *
+     * Se llama al pulsar EMPEZAR o VOLVER A EMPEZAR, no al montar la
+     * partida: el repintado que se hace al cargar el pool en segundo plano
+     * no debe gastar preguntas que nadie ha visto.
+     */
+    function marcarVistas(preguntas) {
+        if (!preguntas || !preguntas.length) {
+            return;
+        }
+        // Sin temas (banco de reserva) no hay rotación que guardar
+        if (typeof preguntas[0].tema !== 'string') {
+            return;
+        }
+
+        const base = vistasPendientes
+            ? vistasPendientes.vistas
+            : leerVistas().vistas;
+        const hashes = preguntas.map(function (pregunta) {
+            return hashPregunta(pregunta.pregunta);
+        });
+
+        guardarVistas(base.concat(hashes), hashes);
+        vistasPendientes = null;
+    }
+
+    /** Guarda las vistas sin romper la partida si el almacenamiento falla. */
+    function guardarVistas(vistas, ultimas) {
+        try {
+            window.localStorage.setItem(
+                CLAVE_VISTAS,
+                JSON.stringify({
+                    tamano: banco.length,
+                    hashes: vistas.slice(-MAXIMO_VISTAS),
+                    ultimas: ultimas.slice(-TOTAL)
+                })
+            );
+        } catch (error) {
+            // Modo privado o almacenamiento lleno: se sigue jugando
+        }
+    }
+
+    /** Agrupa el banco por tema. Devuelve un `Map` vacío si no hay temas. */
+    function agruparPorTema(lista) {
+        const grupos = new Map();
+        lista.forEach(function (pregunta) {
+            const tema =
+                typeof pregunta.tema === 'string' ? pregunta.tema.trim() : '';
+            if (!tema) {
+                return;
+            }
+            if (!grupos.has(tema)) {
+                grupos.set(tema, []);
+            }
+            grupos.get(tema).push(pregunta);
+        });
+        return grupos;
+    }
+
+    /** Devuelve una copia barajada de la lista (Fisher-Yates). */
+    function barajar(lista, aleatorio) {
+        for (let i = lista.length - 1; i > 0; i--) {
+            const j = Math.floor(aleatorio() * (i + 1));
+            const temporal = lista[i];
+            lista[i] = lista[j];
+            lista[j] = temporal;
+        }
+        return lista;
     }
 
     /**
@@ -328,12 +538,18 @@
      */
     function mezclarPartida(preguntas) {
         const mezcladas = preguntas.map(function (pregunta) {
-            return {
+            const copia = {
                 pregunta: pregunta.pregunta,
                 opciones: pregunta.opciones.slice(),
                 correcta: pregunta.correcta,
                 explicacion: pregunta.explicacion
             };
+            // El tema viaja con la pregunta: la rotación y las cuotas lo
+            // necesitan después de mezclar
+            if (typeof pregunta.tema === 'string') {
+                copia.tema = pregunta.tema;
+            }
+            return copia;
         });
 
         // Se barajan las opciones de cada pregunta y se recalcula la correcta
@@ -947,6 +1163,7 @@
         // Se reinicia siempre: así una partida nueva nunca hereda el estado
         // de la anterior (por ejemplo, si se vuelve desde la pantalla final)
         reiniciarPartida();
+        marcarVistas(partida);
         pantallaInicio.classList.add('oculto');
         pantallaFinal.classList.add('oculto');
         pantallaQuiz.classList.remove('oculto');
@@ -1045,6 +1262,7 @@
     botonReiniciar.addEventListener('click', function () {
         cerrarRevision();
         reiniciarPartida();
+        marcarVistas(partida);
         sonar('arranque');
         pantallaFinal.classList.add('oculto');
         pantallaQuiz.classList.remove('oculto');

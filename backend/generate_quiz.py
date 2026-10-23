@@ -46,6 +46,7 @@ SOLAPAMIENTO_MINIMO = 0.20   # parecido mínimo entre enunciado y texto
 SOLAPAMIENTO_OPCION = 0.35   # parecido mínimo entre la opción correcta y el texto
 PENSAMIENTO = False         # desactivar el razonamiento del modelo: multiplica la velocidad
 CONTEXTO_POOL = 8192        # ventana de contexto para las llamadas del pool
+MAX_TOKENS_RESPUESTA = 4096 # tope de respuesta (evita el 402 de OpenRouter)
 SEMILLA = 20240517           # semilla para que el barajado sea reproducible
 FICHERO_CACHE = config.RAIZ / "logs" / "preguntas_cache.json"  # progreso intermedio
 CHECKPOINT_CADA = 25        # guarda el pool cada N preguntas generadas
@@ -318,6 +319,10 @@ def _llamar_openrouter(prompt, esquema=None):
         "temperature": 0.35,
         "top_p": 0.9,
         "stream": True,
+        # Sin max_tokens, OpenRouter reserva el máximo del modelo (131.072
+        # tokens) y rechaza la petición con 402 aunque haya saldo. Con un
+        # lote de 4 preguntas, 4.096 tokens sobran.
+        "max_tokens": MAX_TOKENS_RESPUESTA,
     }
 
     # Se pide la respuesta en JSON con el esquema de las preguntas

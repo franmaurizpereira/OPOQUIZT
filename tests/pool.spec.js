@@ -60,16 +60,19 @@ async function empezarPartida(page) {
 }
 
 test.describe('Pool de preguntas (js/quiz_pool.json)', () => {
-    test('el pool real existe y tiene al menos 500 preguntas válidas', async () => {
+    test('el pool real existe y tiene al menos 1.900 preguntas válidas', async () => {
         expect(
             fs.existsSync(RUTA_POOL_REAL),
-            'js/quiz_pool.json no existe: ejecuta backend/generate_quiz.py --pool 600'
+            'js/quiz_pool.json no existe: ejecuta backend/generate_quiz.py --pool 2100'
         ).toBe(true);
 
         const pool = JSON.parse(fs.readFileSync(RUTA_POOL_REAL, 'utf-8'));
 
         expect(Array.isArray(pool), 'el pool debe ser una lista').toBe(true);
-        expect(pool.length, 'el pool debe tener al menos 500 preguntas').toBeGreaterThanOrEqual(500);
+        expect(
+            pool.length,
+            'el pool debe tener al menos 1.900 preguntas'
+        ).toBeGreaterThanOrEqual(1900);
 
         for (const [i, pregunta] of pool.entries()) {
             expect(Object.keys(pregunta).sort(), `pregunta ${i + 1}`).toEqual([
@@ -77,7 +80,10 @@ test.describe('Pool de preguntas (js/quiz_pool.json)', () => {
                 'explicacion',
                 'opciones',
                 'pregunta',
+                'tema',
             ]);
+            expect(typeof pregunta.tema, `pregunta ${i + 1}`).toBe('string');
+            expect(pregunta.tema.length, `pregunta ${i + 1}`).toBeGreaterThan(3);
             expect(typeof pregunta.pregunta, `pregunta ${i + 1}`).toBe('string');
             expect(pregunta.pregunta.length, `pregunta ${i + 1}`).toBeGreaterThan(10);
             expect(Array.isArray(pregunta.opciones), `pregunta ${i + 1}`).toBe(true);
@@ -87,6 +93,20 @@ test.describe('Pool de preguntas (js/quiz_pool.json)', () => {
             expect(pregunta.correcta).toBeLessThanOrEqual(3);
             expect(typeof pregunta.explicacion, `pregunta ${i + 1}`).toBe('string');
             expect(pregunta.explicacion.length, `pregunta ${i + 1}`).toBeGreaterThan(20);
+        }
+    });
+
+    test('el pool real cubre los 9 temas con al menos 50 preguntas cada uno', async () => {
+        const pool = JSON.parse(fs.readFileSync(RUTA_POOL_REAL, 'utf-8'));
+
+        const cuenta = {};
+        pool.forEach((pregunta) => {
+            cuenta[pregunta.tema] = (cuenta[pregunta.tema] || 0) + 1;
+        });
+
+        expect(Object.keys(cuenta), 'el pool debe tener 9 temas').toHaveLength(9);
+        for (const [tema, cuantas] of Object.entries(cuenta)) {
+            expect(cuantas, `el tema ${tema} debe tener al menos 50 preguntas`).toBeGreaterThanOrEqual(50);
         }
     });
 

@@ -25,12 +25,20 @@
       pruebas nuevas.
 
 - [ ] **3. Generar el pool de 2.100** (RF1, RF3, RF14)
-      Ejecutar `python backend/generate_quiz.py --pool 2100 --desde-cero`
-      (aparta él mismo la caché anterior) y revisar una muestra del 10 % a
-      mano.
+      Ejecutar `python backend/generate_quiz.py --pool 2100` (reanuda
+      desde la caché: ya hay 633 preguntas generadas) y después
+      `python backend/generate_quiz.py --mejorar-explicaciones`, porque el
+      modelo nuevo escribe «el texto» en el 73 % de las explicaciones (la
+      versión anterior se reescribió a mano una vez y por eso no las
+      tenía). Revisar después una muestra del 10 %.
       Hecho cuando: `js/quiz_pool.json` tiene ≥1.950 preguntas, los 9
-      temas, 85-435 por tema y ninguna fuga de inglés.
-      **Bloqueada:** falta `OPENROUTER_API_KEY` en el entorno.
+      temas, 85-435 por tema, sin fugas de inglés y sin «el texto» en las
+      explicaciones.
+      **Bloqueada:** la cuenta de OpenRouter tiene **0 créditos**
+      (`total_credits: 0`); el modelo de pago devuelve 402 y el único
+      gratuito que responde invierte la opción correcta. Hacen falta ~1 $
+      de saldo. Mientras tanto `js/quiz_pool.json` se ha restaurado a las
+      600 preguntas que funcionaban.
 
 - [ ] **4. Verificador y medidor de cobertura** (RF11, RF13)
       `backend/verificar_pool.py`: mínimo 1.900, `tema` obligatorio y

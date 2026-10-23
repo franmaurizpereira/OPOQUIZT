@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import config
 import generate_quiz as g
 import historial
+import verificar_pool
 
 
 def fragmentos_de_prueba(num_pdf=9, por_pdf=300, longitud=400, prefijo="doc"):
@@ -870,6 +871,95 @@ class TestValidarExplicaciones(unittest.TestCase):
     def test_se_rechaza_una_explicacion_que_repite_el_enunciado(self):
         enunciado = "Esta es la pregunta tal cual está escrita aquí."
         self.assertFalse(g._explicacion_valida(enunciado, enunciado))
+
+
+class TestVerificarPool(unittest.TestCase):
+    """El verificador rechaza lo que no debe llegar al juego y mide cobertura."""
+
+    def _pregunta(self, numero, tema="Tema 1", explicacion="Explicación suficientemente larga."):
+        return {
+            "pregunta": f"¿Qué establece la norma {numero}?",
+            "opciones": [f"uno {numero}", f"dos {numero}", f"tres {numero}", f"cuatro {numero}"],
+            "correcta": numero % 4,
+            "explicacion": explicacion,
+            "tema": tema,
+        }
+
+    def _pool(self, por_tema=1, temas=9):
+        etiquetas = [etiqueta for _, etiqueta in config.TEMAS_PDF]
+        return [
+            self._pregunta(tema * 100 + indice, tema=etiquetas[tema])
+            for tema in range(temas)
+            for indice in range(por_tema)
+        ]
+
+    def _comprobar(self, datos, **extra):
+        with tempfile.TemporaryDirectory() as directorio:
+            ruta = Path(directorio) / "quiz_pool.json"
+            ruta.write_text(json.dumps(datos, ensure_ascii=False), encoding="utf-8")
+            return verificar_pool.comprobar(ruta, 0, **extra)
+
+    def test_un_pool_valido_pasa(self):
+        ok, problemas, _ = self._comprobar(self._pool(por_tema=60))
+        self.assertTrue(ok, problemas)
+
+    def test_rechaza_preguntas_sin_tema(self):
+        datos = self._pool()
+        datos[0].pop("tema")
+        ok, problemas, _ = self._comprobar(datos)
+        self.assertFalse(ok)
+        self.assertTrue(any("sin tema" in p for p in problemas), problemas)
+
+    def test_rechaza_un_tema_con_pocas_preguntas(self):
+        flojo = config.TEMAS_PDF[3][1]
+        datos = self._pool(por_tema=60)
+        datos = [p for p in datos if p["tema"] != flojo] + [
+            self._pregunta(9000 + i, tema=flojo) for i in range(20)
+        ]
+        ok, problemas, _ = self._comprobar(datos)
+        self.assertFalse(ok)
+        self.assertTrue(any(flojo in p for p in problemas), problemas)
+
+    def test_rechaza_palabras_en_ingles(self):
+        datos = self._pool()
+        datos[0]["pregunta"] = "¿Qué dice el artículo sobre protected under la ley?"
+        ok, problemas, _ = self._comprobar(datos)
+        self.assertFalse(ok)
+        self.assertTrue(any("inglés" in p for p in problemas), problemas)
+
+    def test_rechaza_explicaciones_que_hablan_del_texto(self):
+        datos = self._pool()
+        datos[0]["explicacion"] = "Según el texto, la opción correcta es la primera."
+        ok, problemas, _ = self._comprobar(datos)
+        self.assertFalse(ok)
+        self.assertTrue(any("el texto" in p for p in problemas), problemas)
+
+    def test_cobertura_calcula_texto_y_paginas(self):
+        chunks = [
+            (1, "/pdfs/a.pdf", 1, 100),
+            (2, "/pdfs/a.pdf", 2, 300),
+            (3, "/pdfs/b.pdf", 1, 400),
+            (4, "/pdfs/b.pdf", 2, 200),
+        ]
+        informe = verificar_pool.cobertura(chunks, {2, 3})
+
+        self.assertAlmostEqual(informe["texto_pct"], 0.7)
+        # Dos de las cuatro páginas tienen pregunta
+        self.assertAlmostEqual(informe["paginas_pct"], 0.5)
+        self.assertAlmostEqual(
+            informe["por_documento"]["/pdfs/a.pdf"]["texto_pct"], 0.75
+        )
+
+    def test_la_cobertura_baja_es_un_problema(self):
+        chunks = [
+            (1, "/pdfs/a.pdf", 1, 100),
+            (2, "/pdfs/a.pdf", 2, 900),
+        ]
+        ok, problemas, _ = self._comprobar(
+            self._pool(), chunks=chunks, usados={1}
+        )
+        self.assertFalse(ok)
+        self.assertTrue(any("del texto" in p for p in problemas), problemas)
 
 
 if __name__ == "__main__":
