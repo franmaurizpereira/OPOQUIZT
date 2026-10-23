@@ -239,6 +239,42 @@ class TestSeleccionChunksParaPool(unittest.TestCase):
         self.assertEqual(g.seleccionar_chunks_para_pool([], 100), [])
 
 
+class TestIndiceDuplicados(unittest.TestCase):
+    """El índice de duplicados da el mismo resultado que la fuerza bruta."""
+
+    def test_coincide_con_la_busqueda_completa(self):
+        def pregunta(n, texto=None, opciones=None):
+            return {
+                "pregunta": texto or f"¿Qué establece la norma {n} sobre el plazo?",
+                "opciones": opciones or [
+                    f"El plazo {n} de la norma {n}",
+                    f"Otro plazo distinto {n}",
+                    f"Ningún plazo para el caso {n}",
+                    f"Un plazo mayor para el supuesto {n}",
+                ],
+                "correcta": 0,
+                "explicacion": "Explicación suficientemente larga.",
+            }
+
+        pool = [pregunta(i) for i in range(40)]
+        # Duplicado exacto, mismo enunciado y opciones casi iguales
+        pruebas = [
+            pregunta(99, texto="¿Qué establece la norma 7 sobre el plazo?"),
+            pregunta(98, opciones=[
+                "El plazo 7 de la norma 7",
+                "Otro plazo distinto 7",
+                "Ningún plazo para el caso 7",
+                "Un plazo mayor para el supuesto 7",
+            ]),
+            pregunta(97),
+        ]
+
+        indice = g.IndiceDuplicados(pool)
+        for candidata in pruebas:
+            completo = g._son_duplicadas_con_pool(candidata, pool)
+            self.assertEqual(indice.contiene_duplicada(candidata), completo)
+
+
 class TestEnunciadosSinReferencias(unittest.TestCase):
     """Un enunciado no puede hablar del contexto del que sale."""
 

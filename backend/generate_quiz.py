@@ -746,6 +746,20 @@ def generar_preguntas_pool(
         ruta_cache = config.RUTA_CACHE_POOL
     ya_en_pool = {p.get("contexto_id") for p in pool}
     objetivos = [c for c in contextos if c["id"] not in ya_en_pool]
+
+    # Los fragmentos se intercalan por documento. Si se generan en bloques
+    # por PDF, una ejecución que se corta a medias deja temarios enteros sin
+    # tocar y la cobertura se queda corta aunque haya muchas preguntas.
+    colas = {}
+    for contexto in objetivos:
+        colas.setdefault(contexto["ruta_pdf"], deque()).append(contexto)
+    intercalados = []
+    while any(colas.values()):
+        for ruta in sorted(colas):
+            if colas[ruta]:
+                intercalados.append(colas[ruta].popleft())
+    objetivos = intercalados
+
     lotes = [
         objetivos[i : i + tamanho_lote] for i in range(0, len(objetivos), tamanho_lote)
     ]
@@ -762,6 +776,7 @@ def generar_preguntas_pool(
     # peticiones en vuelo y, en cuanto una termina, se procesa y se lanza la
     # siguiente. Antes se esperaba a la tanda entera y un lote lento (o un
     # reintento) bloqueaba a los demás.
+    indice = IndiceDuplicados(pool)
     pendientes = deque(lotes)
     en_curso = {}
     lanzados = 0
@@ -790,10 +805,11 @@ def generar_preguntas_pool(
 
                 nuevas = []
                 for pregunta in validas:
-                    if _son_duplicadas_con_pool(pregunta, pool + nuevas):
+                    if indice.contiene_duplicada(pregunta):
                         print("    pregunta descartada por estar repetida", flush=True)
                         continue
                     nuevas.append(pregunta)
+                    indice.anadir(pregunta)
 
                 pool.extend(nuevas)
                 generadas += len(nuevas)
@@ -1622,6 +1638,48 @@ def _son_duplicadas_con_pool(pregunta, pool, umbral=0.5):
         if _son_duplicadas(pregunta, otra, umbral=umbral):
             return True
     return False
+
+
+class IndiceDuplicados:
+    """Busca duplicados sin comparar con todas las preguntas del pool.
+
+    Comparar cada pregunta nueva con las 2.000 anteriores cuesta cada vez
+    más y acaba dominando el tiempo de generación. Como dos duplicados
+    siempre comparten alguna palabra significativa del enunciado o alguna
+    opción exacta, basta con comparar contra las que comparten algo.
+    """
+
+    def __init__(self, pool):
+        self.preguntas = []
+        self.por_palabra = {}
+        self.por_opcion = {}
+        for pregunta in pool:
+            self.anadir(pregunta)
+
+    def anadir(self, pregunta):
+        indice = len(self.preguntas)
+        self.preguntas.append(pregunta)
+        for palabra in _palabras_significativas(pregunta["pregunta"]):
+            self.por_palabra.setdefault(palabra, []).append(indice)
+        for opcion in _opciones_normalizadas(pregunta["opciones"]):
+            self.por_opcion.setdefault(opcion, []).append(indice)
+
+    def contiene_duplicada(self, pregunta, umbral=0.5):
+        candidatos = set()
+        for palabra in _palabras_significativas(pregunta["pregunta"]):
+            candidatos.update(self.por_palabra.get(palabra, ()))
+        for opcion in _opciones_normalizadas(pregunta["opciones"]):
+            candidatos.update(self.por_opcion.get(opcion, ()))
+
+        for indice in sorted(candidatos):
+            if _son_duplicadas(pregunta, self.preguntas[indice], umbral=umbral):
+                return True
+        return False
+
+
+def _opciones_normalizadas(opciones):
+    """Conjunto de opciones normalizadas, como en `_similitud_opciones`."""
+    return {_limpiar_texto(o) for o in opciones if _limpiar_texto(o)}
 
 
 if __name__ == "__main__":
