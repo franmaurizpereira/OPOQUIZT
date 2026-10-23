@@ -803,7 +803,11 @@ def generar_preguntas_pool(
                 if len(pool) - guardadas >= CHECKPOINT_CADA:
                     guardar_cache(pool, ruta_cache)
                     guardadas = len(pool)
-                    publicar(pool, ruta_cache)
+                    # Con OPOQUIZ_SIN_PUBLICAR no se publica el pool a
+                    # medias: la app sigue con el pool bueno que ya tenía
+                    # mientras se genera el nuevo.
+                    if not os.environ.get("OPOQUIZ_SIN_PUBLICAR"):
+                        publicar(pool, ruta_cache)
                     print(
                         f"  [checkpoint] {len(pool)} preguntas guardadas en la caché",
                         flush=True,
