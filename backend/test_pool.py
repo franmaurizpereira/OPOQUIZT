@@ -120,14 +120,74 @@ class TestSeleccionChunksParaPool(unittest.TestCase):
         """Cambiar la semilla cambia el orden, pero no el reparto por PDF."""
         fragmentos = fragmentos_de_prueba(num_pdf=9, por_pdf=300)
 
-        primera = g.seleccionar_chunks_para_pool(fragmentos, 500, semilla=1)
-        segunda = g.seleccionar_chunks_para_pool(fragmentos, 500, semilla=2)
+        primera = g.seleccionar_chunks_para_pool(fragmentos, 500)
+        segunda = g.seleccionar_chunks_para_pool(fragmentos, 500)
 
-        self.assertNotEqual(
+        self.assertEqual(
             [f["id"] for f in primera],
             [f["id"] for f in segunda],
-            "Con semillas distintas el resultado debe cambiar",
+            "La selección es determinista: no depende del azar",
         )
+
+    def test_reparto_proporcional_al_texto(self):
+        """Un documento con el triple de texto recibe el triple de preguntas."""
+        fragmentos = []
+        for indice in range(100):
+            fragmentos.append(
+                {
+                    "id": indice + 1,
+                    "ruta_pdf": "/pdfs/largo.pdf",
+                    "pagina": indice + 1,
+                    "tipo": "texto",
+                    "contenido": "Contenido largo " * 100,
+                }
+            )
+        for indice in range(100):
+            fragmentos.append(
+                {
+                    "id": 1000 + indice,
+                    "ruta_pdf": "/pdfs/corto.pdf",
+                    "pagina": indice + 1,
+                    "tipo": "texto",
+                    "contenido": "Contenido " * 33,
+                }
+            )
+
+        elegidos = g.seleccionar_chunks_para_pool(fragmentos, 100)
+        largos = sum(1 for f in elegidos if f["ruta_pdf"] == "/pdfs/largo.pdf")
+        cortos = sum(1 for f in elegidos if f["ruta_pdf"] == "/pdfs/corto.pdf")
+
+        self.assertEqual(len(elegidos), 100)
+        self.assertGreater(largos, cortos * 3, "El documento largo debe aportar más")
+
+    def test_dentro_de_una_pagina_se_elige_el_mas_largo(self):
+        """Si de una página solo cabe un fragmento, se toma el más largo."""
+        fragmentos = [
+            {
+                "id": 1,
+                "ruta_pdf": "/pdfs/doc.pdf",
+                "pagina": 1,
+                "tipo": "texto",
+                "contenido": "corto " * 60,
+            },
+            {
+                "id": 2,
+                "ruta_pdf": "/pdfs/doc.pdf",
+                "pagina": 1,
+                "tipo": "texto",
+                "contenido": "largo " * 300,
+            },
+            {
+                "id": 3,
+                "ruta_pdf": "/pdfs/doc.pdf",
+                "pagina": 1,
+                "tipo": "texto",
+                "contenido": "medio " * 120,
+            },
+        ]
+
+        elegidos = g.seleccionar_chunks_para_pool(fragmentos, 1)
+        self.assertEqual([f["id"] for f in elegidos], [2])
 
     def test_no_hay_fragmentos_repetidos(self):
         """Un mismo fragmento no se selecciona dos veces."""
@@ -138,7 +198,7 @@ class TestSeleccionChunksParaPool(unittest.TestCase):
         self.assertEqual(len(identificadores), len(set(identificadores)))
 
     def test_pdf_dominante_no_ahoga_al_resto(self):
-        """Un PDF con muchísimos fragmentos no puede acaparar el pool."""
+        """El reparto es proporcional, pero ningún documento se lleva todo."""
         fragmentos = fragmentos_de_prueba(num_pdf=8, por_pdf=50)
         # Se añade un PDF gigante
         identificador = 10000
@@ -156,12 +216,15 @@ class TestSeleccionChunksParaPool(unittest.TestCase):
 
         elegidos = g.seleccionar_chunks_para_pool(fragmentos, 1000)
         dominantes = [f for f in elegidos if f["ruta_pdf"] == "/pdfs/dominante.pdf"]
+        pequenos = {
+            f["ruta_pdf"] for f in elegidos if f["ruta_pdf"] != "/pdfs/dominante.pdf"
+        }
 
-        # El tope del 30 % se respeta siempre: 300 de 1000
-        self.assertLessEqual(len(dominantes), 300)
-        # Con el tope estricto pueden quedar huecos: 8 PDF pequeños (50 cada
-        # uno) más 300 del dominante = 700 fragmentos.
-        self.assertEqual(len(elegidos), 700)
+        self.assertEqual(len(elegidos), 1000)
+        # Aporta más que ningún otro, pero deja sitio a los demás documentos
+        self.assertGreater(len(dominantes), 500)
+        self.assertLess(len(dominantes), 1000)
+        self.assertEqual(len(pequenos), 8, "Los 8 documentos pequeños deben participar")
 
     def test_pocos_fragmentos_devuelve_lo_que_hay(self):
         """Si no hay suficientes fragmentos, se devuelven todos los posibles."""
@@ -173,6 +236,108 @@ class TestSeleccionChunksParaPool(unittest.TestCase):
     def test_sin_fragmentos_devuelve_lista_vacia(self):
         """Sin fragmentos en la base de datos no se selecciona nada."""
         self.assertEqual(g.seleccionar_chunks_para_pool([], 100), [])
+
+
+class TestTemasDelPool(unittest.TestCase):
+    """El tema de cada pregunta se deduce del PDF del que sale."""
+
+    def test_los_nueve_documentos_tienen_etiqueta(self):
+        rutas = [
+            "pdfs/01_Constitucion_Española_1978_Derechos.pdf",
+            "pdfs/02_Cortes_Generales_Atribuciones.pdf",
+            "pdfs/03_Gobierno_composicion_Nombramiento_cese_funciones_Gobierno_Relaciones_entre_Gobierno_las_Cortes_Generales.pdf",
+            "pdfs/04_texto_refundido_Estatuto_Basico_Empleado_Publico.pdf",
+            "pdfs/05_Igualdad de Genero_Violencia_Genero.pdf",
+            "pdfs/07_proteccion_datos_personales_regimen_juridico.pdf",
+            "pdfs/08_Acceso_electronico_ciudadanos_servicios_publicos.pdf",
+            "pdfs/La_sociedad_informacion_Identidad_firma.pdf",
+            "pdfs/Instrumentos_para_acceso_electronico_Administraciones.pdf",
+        ]
+        etiquetas = {config.tema_de_fuente(r + " (pág. 2)") for r in rutas}
+
+        self.assertEqual(len(etiquetas), 9, "Cada documento debe tener su tema")
+        self.assertIn("Constitución Española", etiquetas)
+        self.assertIn("Estatuto Básico del Empleado Público", etiquetas)
+
+    def test_gobierno_no_se_confunde_con_cortes_generales(self):
+        """El título del PDF de Gobierno menciona las Cortes: no debe confundirse."""
+        gobierno = (
+            "pdfs/03_Gobierno_composicion_Nombramiento_cese_funciones_Gobierno_"
+            "Relaciones_entre_Gobierno_las_Cortes_Generales.pdf (pág. 5)"
+        )
+        cortes = (
+            "pdfs/02_Cortes_Generales_Atribuciones_Congreso_Diputados_Senado.pdf "
+            "(pág. 5)"
+        )
+
+        self.assertEqual(config.tema_de_fuente(gobierno), "Gobierno")
+        self.assertEqual(config.tema_de_fuente(cortes), "Cortes Generales")
+
+    def test_documento_desconocido_no_falla(self):
+        """Un PDF nuevo no rompe la generación: se usa su nombre limpio."""
+        self.assertEqual(
+            config.tema_de_fuente("/pdfs/09_nuevo_documento_2026.pdf (pág. 2)"),
+            "nuevo documento 2026",
+        )
+        self.assertEqual(config.tema_de_fuente(""), "General")
+
+    def test_escribir_pool_json_anade_el_tema_de_la_fuente(self):
+        with tempfile.TemporaryDirectory() as directorio:
+            ruta = Path(directorio) / "quiz_pool.json"
+            g.escribir_pool_json(
+                [
+                    {
+                        "pregunta": "¿Qué dice el artículo 14?",
+                        "opciones": ["a", "b", "c", "d"],
+                        "correcta": 0,
+                        "explicacion": "Explicación suficientemente larga.",
+                        "fuente": (
+                            "pdfs/01_Constitucion_Española_1978_Derechos.pdf "
+                            "(pág. 4)"
+                        ),
+                    }
+                ],
+                ruta,
+            )
+            datos = json.loads(ruta.read_text(encoding="utf-8"))
+
+        self.assertEqual(datos[0]["tema"], "Constitución Española")
+
+
+class TestRecorteEquilibrado(unittest.TestCase):
+    """Al recortar el pool ningún tema se queda sin preguntas."""
+
+    def _pool(self, por_tema=100):
+        return [
+            {
+                "pregunta": f"Pregunta {tema} {indice}",
+                "opciones": ["a", "b", "c", "d"],
+                "correcta": 0,
+                "explicacion": "Explicación suficientemente larga.",
+                "tema": f"Tema {tema}",
+            }
+            for tema in range(9)
+            for indice in range(por_tema)
+        ]
+
+    def test_recorta_al_objetivo_sin_dejar_temas_fuera(self):
+        recortado = g.recortar_equilibrado(self._pool(100), 300)
+        temas = {p["tema"] for p in recortado}
+
+        self.assertEqual(len(recortado), 300)
+        self.assertEqual(len(temas), 9, "Los 9 temas deben seguir en el pool")
+
+    def test_respeta_el_minimo_por_tema(self):
+        recortado = g.recortar_equilibrado(self._pool(100), 300, minimo_por_tema=25)
+        cuenta = {}
+        for pregunta in recortado:
+            cuenta[pregunta["tema"]] = cuenta.get(pregunta["tema"], 0) + 1
+
+        self.assertTrue(all(c >= 25 for c in cuenta.values()))
+
+    def test_si_ya_cabe_lo_devuelve_tal_cual(self):
+        pool = self._pool(10)
+        self.assertEqual(len(g.recortar_equilibrado(pool, 500)), len(pool))
 
 
 class TestGenerarPreguntaDesdeChunk(unittest.TestCase):
@@ -472,7 +637,7 @@ class TestEsquemaDelPool(unittest.TestCase):
         self.directorio.cleanup()
 
     def test_campos_exactos_del_esquema(self):
-        """Cada pregunta tiene solo los cuatro campos que usa el quiz."""
+        """Cada pregunta tiene los cuatro campos del quiz más su tema."""
         pregunta = {
             "pregunta": "¿Qué dispone el artículo 12 del cuerpo normativo?",
             "opciones": ["uno", "dos", "tres", "cuatro"],
@@ -487,9 +652,10 @@ class TestEsquemaDelPool(unittest.TestCase):
         self.assertIsInstance(datos, list)
         self.assertEqual(
             set(datos[0]),
-            {"pregunta", "opciones", "correcta", "explicacion"},
-            "El pool debe tener los mismos campos que quizData",
+            {"pregunta", "opciones", "correcta", "explicacion", "tema"},
+            "El pool lleva los campos del quiz y el tema de cada pregunta",
         )
+        self.assertEqual(datos[0]["tema"], "doc")
 
     def test_es_array_json_valido(self):
         """El fichero es un array JSON que se puede leer tal cual."""

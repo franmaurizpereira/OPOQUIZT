@@ -171,22 +171,24 @@ def repartir_contextos(fragmentos, total=TOTAL_PREGUNTAS, minimo_por_pdf=2):
 def seleccionar_chunks_para_pool(
     fragmentos,
     num_preguntas,
-    maximo_por_pdf=0.30,
+    maximo_por_pdf=None,
     minimo_por_pdf=1,
-    semilla=SEMILLA,
 ):
-    """Selecciona fragmentos para el pool repartiendo de forma equilibrada.
+    """Selecciona fragmentos para el pool, priorizando cubrir todo el texto.
 
-    El reparto es por rondas (round-robin): se va tomando un fragmento de cada
-    PDF por turno, de modo que ningún documento acapara las preguntas. Se
-    respeta además un tope por PDF (30 % por defecto) para que la
-    concentración en un solo documento no sea posible.
+    El reparto no es una ronda igual para cada PDF: cada documento aporta en
+    proporción al texto que contiene, de modo que los documentos largos
+    (TREBEP, Gobierno) no se queden a la mitad mientras los cortos van
+    sobrados. Dentro de cada documento se toman primero los fragmentos más
+    largos, pero empezando por uno de cada página: así se cubre el documento
+    entero y no solo sus primeras páginas.
 
-    Dentro de cada PDF los fragmentos se eluyen a lo largo de todo el
-    documento, así que se cubre el contenido completo y no solo su inicio.
+    Con `maximo_por_pdf` (0-1) se puede imponer además un tope de
+    concentración; por defecto no hay tope porque el reparto proporcional ya
+    evita que un documento acapare el pool.
 
-    La selección es determinista: con la misma semilla y los mismos
-    fragmentos devuelve siempre la misma lista.
+    La selección es determinista: con los mismos fragmentos devuelve siempre
+    la misma lista.
     """
     por_pdf = {}
     for frag in fragmentos:
@@ -195,63 +197,83 @@ def seleccionar_chunks_para_pool(
     if not por_pdf:
         return []
 
-    # Cada PDF aporta sus fragmentos ordenados por página (para poder
-    # repartirlos a lo largo del documento) y con contenido suficiente.
+    # Cada PDF aporta sus fragmentos con contenido suficiente; si no hay
+    # ninguno, se usan todos para no quedarse sin material
     ordenados = {}
     for pdf, lista in por_pdf.items():
         candidatos = [f for f in lista if len(f["contenido"]) >= 250] or lista
-        ordenados[pdf] = sorted(candidatos, key=lambda f: (f["pagina"], f["id"]))
+        ordenados[pdf] = candidatos
 
-    # Tope de fragmentos por PDF
-    topes = {}
-    for pdf in ordenados:
-        topes[pdf] = max(minimo_por_pdf, int(num_preguntas * maximo_por_pdf))
+    # Reparto proporcional al texto de cada documento
+    texto_por_pdf = {
+        pdf: sum(len(f["contenido"]) for f in lista)
+        for pdf, lista in ordenados.items()
+    }
+    texto_total = sum(texto_por_pdf.values()) or 1
 
-    # Los PDFs se recorren en un orden barajado con semilla: así el pool no
-    # sale siempre en el mismo orden, pero siempre es reproducible.
-    generador = random.Random(semilla)
-    pdfs = sorted(ordenados)
-    generador.shuffle(pdfs)
+    cuotas = {}
+    for pdf, lista in ordenados.items():
+        cuota = round(num_preguntas * texto_por_pdf[pdf] / texto_total)
+        cuota = max(minimo_por_pdf, cuota)
+        if maximo_por_pdf:
+            tope = max(minimo_por_pdf, int(num_preguntas * maximo_por_pdf))
+            cuota = min(cuota, tope)
+        cuotas[pdf] = min(cuota, len(lista))
+
+    # Si al recortar a lo disponible faltan preguntas, se reparten entre los
+    # documentos que aún tienen fragmentos de sobra
+    while sum(cuotas.values()) < num_preguntas:
+        huecos = {pdf: len(ordenados[pdf]) - cuotas[pdf] for pdf in ordenados}
+        pdf = max(huecos, key=lambda p: (huecos[p], texto_por_pdf[p]))
+        if huecos[pdf] <= 0:
+            break
+        cuotas[pdf] += 1
+
+    # Y si los redondeos se han pasado, se quita del documento que más
+    # aporta: así el recorte final no deja fuera siempre al último PDF
+    while sum(cuotas.values()) > num_preguntas:
+        pdf = max(cuotas, key=lambda p: (cuotas[p], texto_por_pdf[p]))
+        if cuotas[pdf] <= minimo_por_pdf:
+            break
+        cuotas[pdf] -= 1
 
     elegidos = []
-    usados = {pdf: 0 for pdf in ordenados}
-    cursores = {pdf: 0 for pdf in ordenados}
+    for pdf in sorted(ordenados):
+        elegidos.extend(_elegir_de_documento(ordenados[pdf], cuotas[pdf]))
 
-    def _tomar(pdf):
-        """Toma el siguiente fragmento de un PDF, repartido por todo el documento."""
-        disponibles = ordenados[pdf]
-        cursor = cursores[pdf]
-        if cursor >= len(disponibles):
-            return None
-        # Se eluyen los fragmentos para cubrir todo el documento
-        paso = max(1, len(disponibles) // max(1, topes[pdf]))
-        indice = min(cursor * paso + paso // 2, len(disponibles) - 1)
-        cursores[pdf] = cursor + 1
-        return disponibles[indice]
-
-    # Reparto por rondas: una vuelta por todos los PDFs
-    while len(elegidos) < num_preguntas:
-        progreso = False
-        for pdf in pdfs:
-            if len(elegidos) >= num_preguntas:
-                break
-            if usados[pdf] >= topes[pdf]:
-                continue
-            fragmento = _tomar(pdf)
-            if fragmento is None:
-                # Este PDF ya no tiene fragmentos: se sigue con los demás
-                continue
-            elegidos.append(fragmento)
-            usados[pdf] += 1
-            progreso = True
-        if not progreso:
-            break
-
-    # Si con el tope del 30 % no se han llenado los huecos, se devuelven
-    # menos fragmentos: el tope es estricto y prefiero un pool más pequeño
-    # a uno concentrado en un único documento. El resto de fragmentos se
-    # podrá pedir en una segunda llamada con un margen mayor.
     return elegidos[:num_preguntas]
+
+
+def _elegir_de_documento(fragmentos, cuota):
+    """Toma `cuota` fragmentos de un documento, cubriéndolo página a página.
+
+    Primero se elige el fragmento más largo de cada página (así ninguna zona
+    del documento se queda fuera) y después se completa con los más largos
+    que queden.
+    """
+    if cuota <= 0:
+        return []
+
+    por_pagina = {}
+    for frag in fragmentos:
+        actual = por_pagina.get(frag["pagina"])
+        if actual is None or len(frag["contenido"]) > len(actual["contenido"]):
+            por_pagina[frag["pagina"]] = frag
+
+    elegidos = [por_pagina[pagina] for pagina in sorted(por_pagina)]
+    if len(elegidos) >= cuota:
+        return elegidos[:cuota]
+
+    usados = {frag["id"] for frag in elegidos}
+    resto = sorted(
+        (f for f in fragmentos if f["id"] not in usados),
+        key=lambda f: (-len(f["contenido"]), f["id"]),
+    )
+    for frag in resto:
+        if len(elegidos) >= cuota:
+            break
+        elegidos.append(frag)
+    return elegidos[:cuota]
 
 
 # ------------------------------------------------------------------- LLM
@@ -727,6 +749,60 @@ def generar_preguntas_pool(
     return pool[:objetivo]
 
 
+def recortar_equilibrado(pool, cantidad, minimo_por_tema=50):
+    """Recorta el pool a `cantidad` sin dejar ningún tema bajo el mínimo.
+
+    Un `pool[:cantidad]` recortaría siempre a los mismos temas (los últimos
+    de la generación). Aquí se reparte la cantidad de forma proporcional a
+    lo generado y se respeta un suelo por tema, para que ningún temario se
+    quede fuera del pool al recortar.
+    """
+    if len(pool) <= cantidad:
+        return list(pool)
+
+    def tema(pregunta):
+        return pregunta.get("tema") or config.tema_de_fuente(pregunta.get("fuente"))
+
+    por_tema = {}
+    for pregunta in pool:
+        por_tema.setdefault(tema(pregunta), []).append(pregunta)
+
+    if len(por_tema) * minimo_por_tema > cantidad:
+        minimo_por_tema = max(1, cantidad // max(1, len(por_tema)))
+
+    total = sum(len(preguntas) for preguntas in por_tema.values()) or 1
+    sobrante = cantidad - minimo_por_tema * len(por_tema)
+    cuotas = {
+        nombre: minimo_por_tema + round(sobrante * len(preguntas) / total)
+        for nombre, preguntas in por_tema.items()
+    }
+
+    elegidas = []
+    for nombre, preguntas in por_tema.items():
+        elegidas.extend(preguntas[: cuotas[nombre]])
+
+    # Ajuste fino por redondeos: se quitan o se añaden preguntas
+    while len(elegidas) > cantidad:
+        nombre = max(
+            por_tema,
+            key=lambda n: sum(1 for p in elegidas if tema(p) == n),
+        )
+        for indice in range(len(elegidas) - 1, -1, -1):
+            if tema(elegidas[indice]) == nombre:
+                elegidas.pop(indice)
+                break
+
+    if len(elegidas) < cantidad:
+        ya = {id(p) for p in elegidas}
+        for pregunta in pool:
+            if len(elegidas) >= cantidad:
+                break
+            if id(pregunta) not in ya:
+                elegidas.append(pregunta)
+
+    return elegidas[:cantidad]
+
+
 def publicar(pool, ruta_cache=None):
     """Publica el pool en `js/quiz_pool.json` aunque esté a medias.
 
@@ -1017,12 +1093,17 @@ def escribir_pool_json(preguntas, ruta=config.QUIZ_POOL_PATH):
     limpio = []
     for p in preguntas:
         barajada = _barajar_opciones(p, azar)
+        # El tema viaja con la pregunta para que el navegador pueda repartir
+        # la partida por temarios. Si la pregunta ya lo trae se respeta; si
+        # no, se deduce de la fuente; y si tampoco hay fuente, "General".
+        tema = barajada.get("tema") or config.tema_de_fuente(barajada.get("fuente"))
         limpio.append(
             {
                 "pregunta": barajada["pregunta"],
                 "opciones": list(barajada["opciones"]),
                 "correcta": barajada["correcta"],
                 "explicacion": barajada["explicacion"],
+                "tema": tema,
             }
         )
     # Escribir atómicamente: temporal + replace
@@ -1065,6 +1146,14 @@ def parse_args(argv=None):
             "Necesita OPENROUTER_API_KEY."
         ),
     )
+    analizador.add_argument(
+        "--desde-cero",
+        action="store_true",
+        help=(
+            "Ignora la caché del pool y regenera todas las preguntas desde "
+            "cero (junto con --pool N). La caché anterior se aparta."
+        ),
+    )
     return analizador.parse_args(argv)
 
 
@@ -1073,7 +1162,7 @@ def main(argv=None):
     if argumentos.mejorar_explicaciones:
         return main_mejorar_explicaciones()
     if argumentos.pool is not None:
-        return main_pool(argumentos.pool)
+        return main_pool(argumentos.pool, desde_cero=argumentos.desde_cero)
     return main_normal()
 
 
@@ -1317,7 +1406,7 @@ def main_normal():
     print(f"Tiempo total: {round(time.time() - inicio, 1)} s")
 
 
-def main_pool(cantidad):
+def main_pool(cantidad, desde_cero=False):
     """Modo pool: N preguntas para `js/quiz_pool.json`.
 
     No modifica `js/quiz.js`: el pool es un fichero aparte que el frontend
@@ -1325,7 +1414,8 @@ def main_pool(cantidad):
 
     La generación avanza fragmento a fragmento y se guarda el progreso en
     `logs/pool_cache.json` cada `CHECKPOINT_CADA` preguntas, de modo que la
-    ejecución se puede cortar y reanudar sin perder lo ya generado.
+    ejecución se puede cortar y reanudar sin perder lo ya generado. Con
+    `desde_cero=True` la caché anterior se aparta y se empieza de nuevo.
     """
     inicio = time.time()
     if cantidad <= 0:
@@ -1346,28 +1436,29 @@ def main_pool(cantidad):
     print(f"Objetivo del pool: {cantidad} preguntas")
     print(f"Caché del pool: {config.RUTA_CACHE_POOL}")
 
-    # Se recuperan las preguntas de una ejecución anterior: la caché del pool
-    # es propia y se fusiona, nunca se sobrescribe.
-    preguntas_cache = cargar_cache(config.RUTA_CACHE_POOL)
+    if desde_cero and config.RUTA_CACHE_POOL.exists():
+        apartada = config.RUTA_CACHE_POOL.with_name("pool_cache_anterior.json")
+        config.RUTA_CACHE_POOL.replace(apartada)
+        print(f"Modo desde cero: caché anterior apartada en {apartada}")
+
+    preguntas_cache = [] if desde_cero else cargar_cache(config.RUTA_CACHE_POOL)
     if preguntas_cache:
         print(f"Preguntas recuperadas de la caché: {len(preguntas_cache)}")
 
-    # La selección equilibrada reparte los fragmentos por rondas entre todos
-    # los PDF, con un tope del 30 % por documento. Se seleccionan algo más de
-    # los necesarios porque parte de las preguntas se descartan y así queda
-    # material de sobra para llegar al objetivo.
+    # Se seleccionan algo más de fragmentos de los necesarios porque parte
+    # de las preguntas se descartan y así queda material de sobra.
     contextos = seleccionar_chunks_para_pool(fragmentos, int(cantidad * 1.2))
     ya_usados = {p["contexto_id"] for p in preguntas_cache}
     contextos = [c for c in contextos if c["id"] not in ya_usados]
     print(f"Contextos seleccionados: {len(contextos)}")
 
-    # Si la selección por rondas se queda corta, se añaden fragmentos
-    # adicionales del resto del material, también repartidos por PDF.
+    # Si la selección se queda corta, se añaden fragmentos adicionales del
+    # resto del material (también con reparto proporcional).
     if len(contextos) < cantidad - len(preguntas_cache):
         print("Se amplian los contextos con fragmentos adicionales...")
         extras = [f for f in fragmentos if f["id"] not in ya_usados]
         extras = seleccionar_chunks_para_pool(
-            extras, cantidad - len(preguntas_cache), maximo_por_pdf=0.30
+            extras, cantidad - len(preguntas_cache)
         )
         ya_contextos = {c["id"] for c in contextos}
         contextos += [c for c in extras if c["id"] not in ya_contextos]
@@ -1392,7 +1483,7 @@ def main_pool(cantidad):
 
     # Fusión final con la caché: no se sobrescribe lo anterior
     pool = deduplicar_pool(cargar_cache(config.RUTA_CACHE_POOL) + pool)
-    pool = pool[:cantidad]
+    pool = recortar_equilibrado(pool, cantidad)
     barajar_opciones(pool)
     escribir_pool_json(pool)
     guardar_cache(pool, config.RUTA_CACHE_POOL)

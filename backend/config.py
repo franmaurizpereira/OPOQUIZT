@@ -1,6 +1,7 @@
 """Configuración común del backend: credenciales, rutas y modelos."""
 
 import os
+import re
 from pathlib import Path
 
 import yaml
@@ -41,6 +42,47 @@ DIMENSION_EMBEDDING = 384
 
 # Fichero del pool de preguntas (modo --pool)
 QUIZ_POOL_PATH = RAIZ / "js" / "quiz_pool.json"
+
+
+# Temarios del pool: fragmento que identifica el PDF y etiqueta que ve el
+# jugador. El orden es el de los documentos. Se identifica por un trozo del
+# nombre y no por el prefijo numérico porque uno de los PDF no lo lleva.
+TEMAS_PDF = (
+    ("Constitucion_Española", "Constitución Española"),
+    ("Cortes_Generales", "Cortes Generales"),
+    ("Gobierno_composicion", "Gobierno"),
+    ("texto_refundido_Estatuto_Basico", "Estatuto Básico del Empleado Público"),
+    ("Igualdad de Genero", "Igualdad y violencia de género"),
+    ("proteccion_datos_personales", "Protección de datos"),
+    ("Acceso_electronico_ciudadanos", "Acceso electrónico de los ciudadanos"),
+    ("La_sociedad_informacion", "Sociedad de la información"),
+    ("Instrumentos_para_acceso_electronico", "Instrumentos de acceso electrónico"),
+)
+
+
+def _nombre_documento(fuente):
+    """Devuelve el nombre del PDF sin carpeta, extensión ni prefijo numérico."""
+    nombre = str(fuente or "").split(" (pág.")[0].rsplit("/", 1)[-1]
+    nombre = re.sub(r"\.pdf$", "", nombre, flags=re.IGNORECASE)
+    return re.sub(r"^\d+[_\-]", "", nombre).strip()
+
+
+def tema_de_fuente(fuente):
+    """Devuelve la etiqueta del temario a partir de la fuente de una pregunta.
+
+    `fuente` tiene la forma "documento.pdf (pág. N)". La coincidencia es por
+    **prefijo** del nombre del documento, no por subcadena: si no, el PDF de
+    Gobierno (que menciona las Cortes Generales en su título) se confundiría
+    con el de Cortes Generales. Si el documento no está en la lista se
+    devuelve su nombre limpio en vez de fallar: un PDF nuevo no debe romper
+    la generación del pool.
+    """
+    nombre = _nombre_documento(fuente)
+    for fragmento, etiqueta in TEMAS_PDF:
+        if nombre.lower().startswith(fragmento.lower()):
+            return etiqueta
+
+    return nombre.replace("_", " ").strip()[:80] or "General"
 
 
 def leer_credenciales() -> dict:
